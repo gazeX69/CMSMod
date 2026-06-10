@@ -1,0 +1,9 @@
+{
+  "id": "contact-form",
+  "name": "Contact Form",
+  "version": "1.0.0",
+  "description": "Enables creation of customizable contact forms and lead capture.",
+  "author": "Modern CMS Team",
+  "entry": "src/index.js",
+  "compatibility": "^0.1.0"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "default",
+  "name": "Default Minimalist Theme",
+  "version": "1.0.0",
+  "author": "Modern CMS Team",
+  "description": "A clean, modern, and high-performance minimalist theme for blogs and pages.",
+  "templates": {
+    "layout": "templates/layout.html",
+    "home": "templates/home.html",
+    "page": "templates/page.html",
+    "content": "templates/content.html",
+    "search": "templates/search.html",
+    "error": "templates/error.html",
+    "post": "templates/post.html"
+  }
+}

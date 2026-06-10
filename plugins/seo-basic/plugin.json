@@ -1,0 +1,9 @@
+{
+  "id": "seo-basic",
+  "name": "Basic SEO",
+  "version": "1.0.0",
+  "description": "Provides basic metadata and sitemap generation features.",
+  "author": "Modern CMS Team",
+  "entry": "src/index.js",
+  "compatibility": "^0.1.0"
+}

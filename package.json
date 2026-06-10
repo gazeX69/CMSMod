@@ -1,0 +1,16 @@
+{
+  "name": "modern-cms-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter @modern-cms/api dev",
+    "dev:admin": "pnpm --filter @modern-cms/admin dev",
+    "dev:public": "pnpm --filter @modern-cms/public dev",
+    "start:dev": "node scripts/dev-launcher.js",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0",
+    "typescript": "^5.4.5"
+  }
+}

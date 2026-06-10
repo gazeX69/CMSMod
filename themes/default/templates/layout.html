@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ seo.title }}</title>
+    <meta name="description" content="{{ seo.description }}" />
+    <link rel="canonical" href="{{ seo.canonicalUrl }}" />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="site-nav">
+        <a class="brand" href="/">{{ site.title }}</a>
+        <div class="nav-links">{{ site.navigationHtml.primary }}</div>
+      </nav>
+    </header>
+    <main class="site-main">
+      {{ content }}
+    </main>
+    <footer class="site-footer">
+      <div class="footer-links">{{ site.navigationHtml.footer }}</div>
+      <p>&copy; {{ site.year }} {{ site.title }}</p>
+    </footer>
+  </body>
+</html>

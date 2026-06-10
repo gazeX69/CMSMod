@@ -1,0 +1,117 @@
+$ vite --port 5173 "--" "--host" "127.0.0.1"
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m285[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m09.27.19[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m09.32.48[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/nodes/MediaNodeView.tsx[22m
+[2m09.56.39[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/nodes/MediaNodeView.tsx[22m
+[2m13.14.42[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/nodes/MediaNodeView.tsx[22m
+[2m13.14.45[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/nodes/MediaNodeView.tsx[22m
+[2m13.14.46[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/nodes/MediaNodeView.tsx[22m
+[2m13.14.48[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/nodes/MediaNodeView.tsx[22m
+[2m13.15.33[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.15.33[22m [31m[1m[vite][22m[39m Pre-transform error: Transform failed with 1 error:
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:235:2: ERROR: Unexpected "}"
+[2m13.15.33[22m [31m[1m[vite][22m[39m Pre-transform error: Transform failed with 1 error:
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:235:2: ERROR: Unexpected "}"
+[2m13.15.33[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:235:2: ERROR: Unexpected "}"[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts[39m:235:2
+[33m  
+  [33mUnexpected "}"[33m
+  233|        },
+  234|      },
+  235|    });
+     |    ^
+  236|  }
+  237|  
+  [39m
+      at failureErrorWithLog (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:1472:15)
+      at C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:755:50
+      at responseCallbacks.<computed> (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:622:9)
+      at handleIncomingPacket (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:677:12)
+      at Socket.readFromStdout (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:600:7)
+      at Socket.emit (node:events:509:20)
+      at addChunk (node:internal/streams/readable:564:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:515:3)
+      at Readable.push (node:internal/streams/readable:395:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m13.15.35[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.15.45[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.15.45[22m [31m[1m[vite][22m[39m Pre-transform error: Transform failed with 1 error:
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:235:2: ERROR: Unexpected "}"
+[2m13.15.45[22m [31m[1m[vite][22m[39m Pre-transform error: Transform failed with 1 error:
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:235:2: ERROR: Unexpected "}"
+[2m13.15.45[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:235:2: ERROR: Unexpected "}"[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts[39m:235:2
+[33m  
+  [33mUnexpected "}"[33m
+  233|        },
+  234|      },
+  235|    });
+     |    ^
+  236|  }
+  237|  
+  [39m
+      at failureErrorWithLog (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:1472:15)
+      at C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:755:50
+      at responseCallbacks.<computed> (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:622:9)
+      at handleIncomingPacket (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:677:12)
+      at Socket.readFromStdout (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:600:7)
+      at Socket.emit (node:events:509:20)
+      at addChunk (node:internal/streams/readable:564:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:515:3)
+      at Readable.push (node:internal/streams/readable:395:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m13.15.46[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.16.03[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.16.06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.16.22[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.18.02[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.18.02[22m [31m[1m[vite][22m[39m Pre-transform error: Transform failed with 2 errors:
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:120:8: ERROR: The symbol "wrapper" has already been declared
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:148:0: ERROR: Unexpected "export"
+[2m13.18.02[22m [31m[1m[vite][22m[39m Pre-transform error: Transform failed with 2 errors:
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:120:8: ERROR: The symbol "wrapper" has already been declared
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:148:0: ERROR: Unexpected "export"
+[2m13.18.02[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 2 errors:
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:120:8: ERROR: The symbol "wrapper" has already been declared
+C:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts:148:0: ERROR: Unexpected "export"[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/gaze/Documents/cobacoba/CMSC/apps/admin/src/editor/nodes/imageNodeSelection.ts[39m:120:8
+[33m  
+  [33mThe symbol "wrapper" has already been declared[33m
+  118|    }
+  119|  
+  120|    const wrapper = target.closest('[data-node-view-wrapper]');
+     |          ^
+  121|  
+  122|    if (!(wrapper instanceof HTMLElement)) {
+  
+  [33mUnexpected "export"[33m
+  146|  }
+  147|  
+  148|  export function createImageNodeSelectionPlugin(nodeNames: string[]) {
+     |  ^
+  149|    const selectableNodeNames = new Set(nodeNames);
+  150|  
+  [39m
+      at failureErrorWithLog (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:1472:15)
+      at C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:755:50
+      at responseCallbacks.<computed> (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:622:9)
+      at handleIncomingPacket (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:677:12)
+      at Socket.readFromStdout (C:\Users\gaze\Documents\cobacoba\CMSC\node_modules\.pnpm\esbuild@0.21.5\node_modules\esbuild\lib\main.js:600:7)
+      at Socket.emit (node:events:509:20)
+      at addChunk (node:internal/streams/readable:564:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:515:3)
+      at Readable.push (node:internal/streams/readable:395:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m13.18.03[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.18.09[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.19.19[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/provider/EditorProvider.tsx[22m
+[2m13.19.21[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/editor/nodes/MediaNodeView.tsx[22m

@@ -1,0 +1,62 @@
+{
+  "version": "6",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1779951703403,
+      "tag": "0000_white_sally_floyd",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1779954344340,
+      "tag": "0001_glossy_alex_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1779957674744,
+      "tag": "0002_large_blue_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1779958993407,
+      "tag": "0003_thankful_black_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1780008501061,
+      "tag": "0004_lovely_lethal_legion",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1780025293065,
+      "tag": "0005_overjoyed_stark_industries",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1780030000000,
+      "tag": "0006_permission_system_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1780035000000,
+      "tag": "0007_public_navigation_foundation",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `media_files` (
+	`id` bigint AUTO_INCREMENT NOT NULL,
+	`uuid` varchar(36),
+	`filename` varchar(255) NOT NULL,
+	`original_name` varchar(255) NOT NULL,
+	`mime_type` varchar(100) NOT NULL,
+	`extension` varchar(50),
+	`size` bigint NOT NULL,
+	`path` varchar(255) NOT NULL,
+	`public_url` varchar(255),
+	`disk` varchar(50) NOT NULL DEFAULT 'local',
+	`uploaded_by` bigint,
+	`alt_text` text,
+	`caption` text,
+	`metadata_json` text,
+	`deleted_at` datetime,
+	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`updated_at` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `media_files_id` PRIMARY KEY(`id`),
+	CONSTRAINT `media_files_uuid_unique` UNIQUE(`uuid`)
+);

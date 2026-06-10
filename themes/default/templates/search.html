@@ -1,0 +1,10 @@
+<section class="search-page">
+  <h1>{{ page.title }}</h1>
+  <form class="search-form" action="/search" method="get">
+    <input name="q" value="{{ page.query }}" placeholder="Search published content" />
+    <button type="submit">Search</button>
+  </form>
+  <div class="search-results">
+    {{ page.content }}
+  </div>
+</section>

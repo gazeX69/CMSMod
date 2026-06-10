@@ -1,0 +1,11 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'plugins/*'
+
+allowBuilds:
+  '0': esbuild
+  es5-ext: true
+  esbuild: true
+  ffmpeg-static: true
+  sharp: true

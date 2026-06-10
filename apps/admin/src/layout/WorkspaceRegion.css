@@ -1,0 +1,16 @@
+.admin-content-viewport {
+  flex-grow: 1;
+  padding: var(--workspace-padding);
+  overflow-y: auto;
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.52), rgba(2, 6, 23, 0.2)),
+    var(--bg-primary);
+}
+
+.route-view {
+  animation: fadeIn 0.25s ease-out;
+  max-width: 1480px;
+  margin: 0 auto;
+  width: 100%;
+}

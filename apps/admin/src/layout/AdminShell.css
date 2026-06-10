@@ -1,0 +1,34 @@
+:root {
+  --sidebar-expanded-width: 252px;
+  --sidebar-collapsed-width: 76px;
+  --header-height: 68px;
+  --workspace-padding: 2.25rem;
+  --inspector-width: 320px;
+  --editor-max-width: none;
+  --sidebar-width: var(--sidebar-expanded-width);
+}
+
+.admin-layout.sidebar-is-collapsed {
+  --sidebar-width: var(--sidebar-collapsed-width);
+}
+
+.admin-layout.sidebar-is-expanded {
+  --sidebar-width: var(--sidebar-expanded-width);
+}
+
+.admin-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.06), transparent 34rem),
+    var(--bg-primary);
+}
+
+.admin-main {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}

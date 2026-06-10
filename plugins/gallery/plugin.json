@@ -1,0 +1,9 @@
+{
+  "id": "gallery",
+  "name": "Gallery",
+  "version": "1.0.0",
+  "description": "Displays beautiful responsive image galleries on pages and posts.",
+  "author": "Modern CMS Team",
+  "entry": "src/index.js",
+  "compatibility": "^0.1.0"
+}

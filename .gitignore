@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-debug.log
+
+# Build outputs
+dist/
+build/
+
+# Environment configurations
+.env
+.env.local
+.env.*.local
+
+# Storage contents (ignore files inside, keep the directories via .gitkeep)
+storage/cache/*
+!storage/cache/.gitkeep
+storage/logs/*
+!storage/logs/.gitkeep
+storage/temp/*
+!storage/temp/.gitkeep
+
+# Editor/OS specific
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

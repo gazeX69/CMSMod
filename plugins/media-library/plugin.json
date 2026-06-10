@@ -1,0 +1,104 @@
+{
+  "id": "media-library",
+  "name": "Media Library",
+  "version": "1.0.0",
+  "description": "First-party Media Library plugin providing explorer, management, and media upload features.",
+  "author": "Modern CMS Team",
+  "compatibility": "^0.1.0",
+  "layer": "plugin",
+
+  "backend": {
+    "entry": "server/routes.ts",
+    "namespace": "/api/media"
+  },
+
+  "admin": {
+    "menu": "Perpustakaan Media",
+    "route": "media",
+    "bundle": "admin/bundle.js",
+    "css": "admin/bundle.css"
+  },
+
+  "permissions": [
+    {
+      "key": "media.read",
+      "description": "View media files and folders"
+    },
+    {
+      "key": "media.create",
+      "description": "Upload new media files"
+    },
+    {
+      "key": "media.update",
+      "description": "Edit media metadata"
+    },
+    {
+      "key": "media.delete",
+      "description": "Delete or restore media files"
+    }
+  ],
+
+  "settings": [
+    {
+      "key": "media.max_upload_size_mb",
+      "defaultValue": "10",
+      "type": "number",
+      "description": "Maximum media upload size in MB",
+      "isPublic": true
+    },
+    {
+      "key": "media.allowed_groups",
+      "defaultValue": "images,documents",
+      "type": "string",
+      "description": "Comma separated allowed media groups",
+      "isPublic": true
+    },
+    {
+      "key": "media.custom_mime_types",
+      "defaultValue": "",
+      "type": "string",
+      "description": "Additional allowed MIME types",
+      "isPublic": false
+    },
+    {
+      "key": "media.organize_by_date",
+      "defaultValue": "true",
+      "type": "boolean",
+      "description": "Store uploaded files in year/month folders",
+      "isPublic": false
+    },
+    {
+      "key": "media.allow_svg_upload",
+      "defaultValue": "false",
+      "type": "boolean",
+      "description": "Allow SVG uploads",
+      "isPublic": false
+    }
+  ],
+
+  "events": {
+    "emits": [
+      {
+        "name": "media.uploaded",
+        "description": "Emitted after a media file is uploaded"
+      },
+      {
+        "name": "media.deleted",
+        "description": "Emitted after a media file is soft deleted or permanently removed"
+      },
+      {
+        "name": "media.restored",
+        "description": "Emitted after a media file is restored from trash"
+      }
+    ]
+  },
+
+  "storage": {
+    "disk": "local",
+    "root": "media"
+  },
+
+  "migrations": {
+    "directory": "migrations"
+  }
+}

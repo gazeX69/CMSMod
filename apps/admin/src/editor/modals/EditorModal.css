@@ -1,0 +1,68 @@
+.editor-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: editor-modal-backdrop-in 140ms ease-out;
+}
+
+.editor-modal-shell {
+  width: min(90vw, 100%);
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  padding: 1.5rem;
+  animation: editor-modal-shell-in 160ms ease-out;
+}
+
+.editor-modal-shell:focus {
+  outline: none;
+}
+
+.editor-modal-shell--wide {
+  max-height: 90vh;
+}
+
+.editor-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.editor-modal-content {
+  display: block;
+}
+
+@keyframes editor-modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes editor-modal-shell-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
