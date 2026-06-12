@@ -254,4 +254,83 @@
   .workspace-mode-tabs button {
     flex: 1;
   }
+
+  .editor-layout-container {
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .editor-main-panel {
+    gap: 1rem;
+  }
+
+  .editor-card {
+    padding: 0.75rem;
+  }
+
+  .publishing-workspace-header {
+    gap: 0.75rem;
+  }
+
+  .workspace-header-main,
+  .workspace-header-actions {
+    width: 100%;
+  }
+
+  .workspace-header-main {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .workspace-breadcrumb-separator,
+  .workspace-breadcrumb-current {
+    display: none;
+  }
+
+  .workspace-header-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-autosave-status,
+  .workspace-version-pill {
+    align-self: center;
+  }
+
+  .workspace-header-actions .btn-settings-action,
+  .workspace-header-actions .btn-primary-action {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .workspace-title-panel .editor-title-group input {
+    font-size: clamp(1.35rem, 8vw, 1.75rem);
+  }
+
+  .workspace-mode-tabs {
+    overflow-x: auto;
+  }
+
+  .workspace-mode-tabs button {
+    min-width: max-content;
+  }
+
+  .editor-sidebar-panel {
+    opacity: 1;
+  }
+
+  .article-editor-panel.editor-zen-mode {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .workspace-header-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-autosave-status,
+  .workspace-version-pill {
+    display: none;
+  }
 }

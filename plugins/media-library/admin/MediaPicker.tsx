@@ -1,23 +1,46 @@
 import { useState } from 'react';
+import type { MediaAsset } from '@modern-cms/plugin-sdk';
 import MediaExplorer, { MediaFile } from './MediaExplorer';
-import { EditorInsertResult } from '../../../apps/admin/src/editor/contracts';
+import { UNIVERSAL_MEDIA_NODE } from '../editor/UniversalMediaNode';
 
 interface MediaPickerProps {
   apiFetch: (path: string, options?: RequestInit) => Promise<Response>;
-  onSelect?: (result: EditorInsertResult | null) => void;
+  onSelect?: (result: MediaAsset | null) => void;
   onCancel?: () => void;
+  options?: { mimeTypes?: string[]; multiple?: boolean };
 }
 
-export default function MediaPicker({ apiFetch, onSelect, onCancel }: MediaPickerProps) {
+export default function MediaPicker({ apiFetch, onSelect, onCancel, options }: MediaPickerProps) {
   const [selectedFile, setSelectedFile] = useState<MediaFile | null>(null);
 
   const handleInsert = () => {
     if (selectedFile) {
-      onSelect?.({
-        uuid: selectedFile.uuid || undefined,
-        alt: selectedFile.altText || undefined,
-        caption: selectedFile.caption || undefined
-      });
+      const asset: MediaAsset & { alt?: string; url?: string } = {
+        uuid: selectedFile.uuid || '',
+        filename: selectedFile.filename,
+        originalName: selectedFile.originalName,
+        mimeType: selectedFile.mimeType,
+        size: selectedFile.size,
+        altText: selectedFile.altText,
+        caption: selectedFile.caption,
+        publicUrl: selectedFile.publicUrl || '',
+        alt: selectedFile.altText || '',
+        url: selectedFile.publicUrl || '',
+        editorNode: selectedFile.mimeType.startsWith('image/') ? undefined : {
+          type: UNIVERSAL_MEDIA_NODE,
+          attrs: {
+            uuid: selectedFile.uuid || '',
+            mimeType: selectedFile.mimeType,
+            filename: selectedFile.filename,
+            originalName: selectedFile.originalName,
+            size: selectedFile.size,
+            title: selectedFile.originalName,
+            caption: selectedFile.caption || '',
+            display: selectedFile.mimeType === 'application/pdf' ? 'embed' : 'card',
+          },
+        },
+      };
+      onSelect?.(asset);
     }
   };
 
@@ -33,6 +56,8 @@ export default function MediaPicker({ apiFetch, onSelect, onCancel }: MediaPicke
           showSort={false}
           showViewMode={false}
           forcedViewMode="grid"
+          initialMimeFilter={options?.mimeTypes?.some((type) => type.startsWith('image/')) ? 'image' : ''}
+          acceptedMimeTypes={options?.mimeTypes}
         />
       </div>
       

@@ -26,6 +26,14 @@ export async function createRevisionSnapshot(contentId: number, createdBy: numbe
     excerpt: row.excerpt || null,
     body: row.body || null,
     status: row.status,
+    snapshotJson: JSON.stringify({
+      featuredImage: row.featuredImageUrl ? {
+        url: row.featuredImageUrl,
+        assetUuid: row.featuredImageAssetUuid,
+        alt: row.featuredImageAlt || '',
+        source: row.featuredImageSource || 'external',
+      } : null,
+    }),
     revisionNumber: nextRevNumber,
     createdBy,
   });

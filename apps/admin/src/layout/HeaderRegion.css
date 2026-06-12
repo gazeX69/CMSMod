@@ -184,3 +184,65 @@
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.3);
 }
+
+@media (max-width: 900px) {
+  .admin-topbar {
+    gap: 0.65rem;
+    padding: 0 1rem;
+  }
+
+  .topbar-search {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+  }
+
+  .topbar-actions {
+    flex: 0 0 auto;
+    gap: 0.45rem;
+  }
+
+  .topbar-btn .btn-text,
+  .profile-info,
+  .btn-logout-header span,
+  .topbar-actions .topbar-btn-icon:nth-of-type(3) {
+    display: none;
+  }
+
+  .topbar-btn,
+  .btn-logout-header {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .profile-dropdown-container {
+    gap: 0.45rem;
+    padding-left: 0.55rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .admin-topbar {
+    padding: 0 0.75rem;
+  }
+
+  .topbar-search {
+    padding: 0.5rem 0.65rem;
+  }
+
+  .topbar-search input {
+    font-size: 0.8rem;
+  }
+
+  .topbar-btn,
+  .topbar-actions > .topbar-btn-icon,
+  .profile-avatar {
+    display: none;
+  }
+
+  .profile-dropdown-container {
+    border-left: 0;
+    padding-left: 0;
+  }
+}

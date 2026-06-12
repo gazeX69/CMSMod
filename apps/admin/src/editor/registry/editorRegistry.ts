@@ -56,7 +56,8 @@ export class EditorRegistryManager implements IEditorRegistry {
     },
     getAll: () => {
       return Array.from(this.editorCommands.values());
-    }
+    },
+    unregister: (name: string) => this.editorCommands.delete(name)
   };
 
   public nodes = {
@@ -71,6 +72,9 @@ export class EditorRegistryManager implements IEditorRegistry {
     },
     getAll: () => {
       return [...this.editorNodes];
+    },
+    unregister: (name: string) => {
+      this.editorNodes = this.editorNodes.filter(node => node.name !== name);
     }
   };
 
@@ -110,7 +114,8 @@ export class EditorRegistryManager implements IEditorRegistry {
     },
     getByNodeType: (nodeType: string) => {
       return this.propertyPanelsMap.get(nodeType);
-    }
+    },
+    unregister: (nodeType: string) => this.propertyPanelsMap.delete(nodeType)
   };
 
   public inspectorSections = {
@@ -125,7 +130,8 @@ export class EditorRegistryManager implements IEditorRegistry {
       return Array.from(this.inspectorSectionsMap.values())
         .filter(section => section.mode === mode)
         .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
-    }
+    },
+    unregister: (id: string) => this.inspectorSectionsMap.delete(id)
   };
 
   public sidebars = {
@@ -137,7 +143,8 @@ export class EditorRegistryManager implements IEditorRegistry {
     },
     getById: (id: string) => {
       return this.sidebarsMap.get(id);
-    }
+    },
+    unregister: (id: string) => this.sidebarsMap.delete(id)
   };
 
   private pickerHandler: EditorMediaPickerHandler | null = null;
@@ -165,6 +172,9 @@ export class EditorRegistryManager implements IEditorRegistry {
     },
     getAll: () => {
       return [...this.editorInsertSources];
+    },
+    unregister: (id: string) => {
+      this.editorInsertSources = this.editorInsertSources.filter(source => source.id !== id);
     }
   };
 }

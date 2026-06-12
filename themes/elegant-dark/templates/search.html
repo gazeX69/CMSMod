@@ -1,0 +1,10 @@
+<section class="search-container">
+  <h1>{{ page.title }}</h1>
+  <form class="search-form" action="/search" method="get" style="display: flex; gap: 0.5rem; margin: 1.5rem 0;">
+    <input name="q" value="{{ page.query }}" placeholder="Search published content..." style="flex: 1; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none;" />
+    <button type="submit" style="padding: 0.75rem 1.5rem; border-radius: 8px; border: none; background: var(--primary); color: #09090b; font-weight: bold; cursor: pointer;">Search</button>
+  </form>
+  <div class="search-results">
+    {{ page.content }}
+  </div>
+</section>

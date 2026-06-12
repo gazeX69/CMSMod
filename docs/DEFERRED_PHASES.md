@@ -33,6 +33,6 @@ This document tracks system integrations and phases that have been intentionally
 ---
 
 ## 5. Online Marketplace Client & Licensing
-* **Description**: Dynamic backend and UI client enabling browsing, package signature checks, download streams, and subscription checks.
-* **Status**: `Deferred`
-* **Reason**: Beyond basic Phase 4 Core requirements. Marketplace distributions will be handled in Phase 5.
+* **Description**: Catalog browsing, publisher accounts, purchases, subscriptions, and remote repository product integrations.
+* **Status**: `Product work pending`
+* **Platform foundation**: Distribution Layer, package verification, offline installation, dynamic runtime loading, audit operations, rollback, and Marketplace SDK are implemented.

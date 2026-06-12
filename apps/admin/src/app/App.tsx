@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SystemInfo } from '@modern-cms/shared';
 import Login from './Login.tsx';
 import { 
@@ -7,7 +7,7 @@ import {
   FileText, AlertCircle, Folder, Tag, ChevronDown, ChevronRight, ChevronLeft,
   Plug, LayoutDashboard, Files, Palette, Users, Settings,
   ChartLine, Globe, Circle, Bell, HelpCircle, LogOut, ExternalLink,
-  UserPlus, Brush, Trash2, RotateCw
+  UserPlus, Trash2, RotateCw, Menu, Puzzle
 } from 'lucide-react';
 import './App.css';
 import '../layout/AdminShell.css';
@@ -19,10 +19,22 @@ import '../editor/layout/EditorCanvas.css';
 import '../editor/layout/EditorInspector.css';
 
 import { pluginManager } from '../plugins/pluginManager';
-import ArticleManager from '../pages/ArticleManager.tsx';
+import { syncAdminPluginRuntime } from '../plugins/registry';
+import { PluginErrorBoundary } from '../plugins/PluginErrorBoundary';
+import { AdminMediaPickerHost } from '../plugins/AdminMediaPickerHost';
+import ContentManager from '../pages/ContentManager.tsx';
+import ThemeSettingsPage from '../pages/ThemeSettingsPage.tsx';
+import WidgetsPage from '../pages/WidgetsPage.tsx';
+
 
 export default function App() {
-  const [user, setUser] = useState<{ id: number; username: string; email: string } | null>(null);
+  const [user, setUser] = useState<{
+    id: number;
+    username: string;
+    email: string;
+    roles?: string[];
+    permissions?: string[];
+  } | null>(null);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
 
   // Dashboard status variables
@@ -32,21 +44,65 @@ export default function App() {
   const [loadingMetrics, setLoadingMetrics] = useState<boolean>(false);
   const [metricError, setMetricError] = useState<string | null>(null);
 
+  // Reading settings states
+  const [homepageMode, setHomepageMode] = useState<string>('single');
+  const [homepageTarget, setHomepageTarget] = useState<string>('');
+  const [postsPageTarget, setPostsPageTarget] = useState<string>('');
+  const [postsPerPage, setPostsPerPage] = useState<number>(10);
+  const [permalinkStructure, setPermalinkStructure] = useState<string>('/posts/%postname%/');
+  const [savingSettings, setSavingSettings] = useState<boolean>(false);
+  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
   // Navigation state
   const [currentRoute, setCurrentRoute] = useState<string>('dashboard');
   const [settingsTab, setSettingsTab] = useState<string>('general');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Pages sub-view navigation state
   const [pagesSubView, setPagesSubView] = useState<'list' | 'create' | 'edit'>('list');
   // TAMBAHKAN KEMBALI BARIS INI:
   const [postsSubView, setPostsSubView] = useState<'list' | 'create' | 'edit'>('list');
   const [editingPostRouteId, setEditingPostRouteId] = useState<number | null>(null);
+  const [editingPageRouteId, setEditingPageRouteId] = useState<number | null>(null);
 
   // Sidebar collapsible state
   const [articlesExpanded, setArticlesExpanded] = useState(false);
   const [pagesExpanded, setPagesExpanded] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavigation, setMobileNavigation] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 900px)');
+    const syncNavigationMode = () => {
+      setMobileNavigation(mediaQuery.matches);
+      if (mediaQuery.matches) setSidebarCollapsed(true);
+    };
+
+    syncNavigationMode();
+    mediaQuery.addEventListener('change', syncNavigationMode);
+    return () => mediaQuery.removeEventListener('change', syncNavigationMode);
+  }, []);
+
+  useEffect(() => {
+    if (mobileNavigation) setSidebarCollapsed(true);
+  }, [currentRoute, mobileNavigation]);
+
+  // User Management state
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [rolesList, setRolesList] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [usersSuccess, setUsersSuccess] = useState<string | null>(null);
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+
+  // Form fields
+  const [userFormUsername, setUserFormUsername] = useState('');
+  const [userFormEmail, setUserFormEmail] = useState('');
+  const [userFormPassword, setUserFormPassword] = useState('');
+  const [userFormRoleId, setUserFormRoleId] = useState<number | ''>('');
+  const [userFormStatus, setUserFormStatus] = useState('active');
+  const [userFormSubmitting, setUserFormSubmitting] = useState(false);
 
   // Taxonomy page CRUD states
   const [taxName, setTaxName] = useState('');
@@ -72,6 +128,54 @@ export default function App() {
 
   const [pluginsList, setPluginsList] = useState<any[]>([]);
   const [loadingPlugins, setLoadingPlugins] = useState<boolean>(false);
+  const [installingPackage, setInstallingPackage] = useState(false);
+  const packageUploadRef = useRef<HTMLInputElement | null>(null);
+  const [, setPluginRuntimeVersion] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void syncAdminPluginRuntime(pluginsList).then(() => {
+      if (!cancelled) setPluginRuntimeVersion((version) => version + 1);
+    });
+    return () => { cancelled = true; };
+  }, [pluginsList]);
+
+  // Theme management state
+  const [themesList, setThemesList] = useState<any[]>([]);
+  const [loadingThemes, setLoadingThemes] = useState<boolean>(false);
+  const [themesError, setThemesError] = useState<string | null>(null);
+  const [themesSuccess, setThemesSuccess] = useState<string | null>(null);
+  const [activatingTheme, setActivatingTheme] = useState<string | null>(null);
+  const [themeSettingsId, setThemeSettingsId] = useState<string | null>(null);
+
+
+  // Menu Management State
+  const [navLocation, setNavLocation] = useState<string>('primary');
+  const [navLocationsList, setNavLocationsList] = useState<string[]>(['primary', 'footer']);
+  const [navItems, setNavItems] = useState<any[]>([]);
+  const [loadingNav, setLoadingNav] = useState<boolean>(false);
+  const [navError, setNavError] = useState<string | null>(null);
+  const [navSuccess, setNavSuccess] = useState<string | null>(null);
+  const [savingNav, setSavingNav] = useState<boolean>(false);
+  const [newCustomLabel, setNewCustomLabel] = useState<string>('');
+  const [newCustomUrl, setNewCustomUrl] = useState<string>('');
+  const [selectedPages, setSelectedPages] = useState<number[]>([]);
+  const [selectedPosts, setSelectedPosts] = useState<number[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [showCustomLocationModal, setShowCustomLocationModal] = useState<boolean>(false);
+  const [customLocationName, setCustomLocationName] = useState<string>('');
+  const [navPages, setNavPages] = useState<any[]>([]);
+  const [navPosts, setNavPosts] = useState<any[]>([]);
+  const [navCategories, setNavCategories] = useState<any[]>([]);
+  const [navTags, setNavTags] = useState<any[]>([]);
+  const [accordionState, setAccordionState] = useState<Record<string, boolean>>({
+    pages: true,
+    posts: false,
+    categories: false,
+    tags: false,
+    custom: false,
+  });
 
   const apiFetch = async (path: string, options: RequestInit = {}) => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4000';
@@ -113,6 +217,328 @@ export default function App() {
     }
   };
 
+  const handleLocalPackageUpload = async (file: File | null) => {
+    if (!file) return;
+    setInstallingPackage(true);
+    try {
+      const form = new FormData();
+      form.append('package', file);
+      const response = await apiFetch('/api/admin/packages/upload?allowUnsigned=true&activate=true', { method: 'POST', body: form });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Package installation failed');
+      await loadPlugins();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Package installation failed');
+    } finally {
+      setInstallingPackage(false);
+      if (packageUploadRef.current) packageUploadRef.current.value = '';
+    }
+  };
+
+  const loadThemes = async () => {
+    setLoadingThemes(true);
+    setThemesError(null);
+    try {
+      const res = await apiFetch('/api/admin/themes');
+      if (res.ok) {
+        const data = await res.json();
+        setThemesList(data.themes || []);
+      } else {
+        setThemesError('Failed to load themes');
+      }
+    } catch (err) {
+      console.error('Failed to load themes:', err);
+      setThemesError('Network error loading themes');
+    } finally {
+      setLoadingThemes(false);
+    }
+  };
+
+  const handleActivateTheme = async (id: string) => {
+    setActivatingTheme(id);
+    setThemesError(null);
+    setThemesSuccess(null);
+    try {
+      const res = await apiFetch(`/api/admin/themes/${id}/activate`, { method: 'POST' });
+      if (res.ok) {
+        setThemesSuccess(`Theme "${id}" activated successfully`);
+        await loadThemes();
+      } else {
+        const errData = await res.json();
+        setThemesError(errData.error || 'Failed to activate theme');
+      }
+    } catch (err) {
+      console.error(err);
+      setThemesError('Network error activating theme');
+    } finally {
+      setActivatingTheme(null);
+    }
+  };
+
+
+  const handleScanThemes = async () => {
+    setThemesError(null);
+    setThemesSuccess(null);
+    try {
+      const res = await apiFetch('/api/admin/themes/scan', { method: 'POST' });
+      if (res.ok) {
+        setThemesSuccess('Theme scan completed');
+        await loadThemes();
+      } else {
+        setThemesError('Failed to scan themes');
+      }
+    } catch (err) {
+      setThemesError('Network error scanning themes');
+    }
+  };
+
+  // Menu Management Handlers
+  const loadMenuResources = async () => {
+    try {
+      const [pagesRes, postsRes, catsRes, tagsRes] = await Promise.all([
+        apiFetch('/api/pages'),
+        apiFetch('/api/posts'),
+        apiFetch('/api/categories'),
+        apiFetch('/api/tags')
+      ]);
+      
+      if (pagesRes.ok) setNavPages(await pagesRes.json());
+      if (postsRes.ok) setNavPosts(await postsRes.json());
+      if (catsRes.ok) setNavCategories(await catsRes.json());
+      if (tagsRes.ok) setNavTags(await tagsRes.json());
+    } catch (err) {
+      console.error('Failed to load menu resources:', err);
+    }
+  };
+
+  const loadNavigationLocations = async () => {
+    try {
+      const res = await apiFetch('/api/admin/navigation/locations');
+      if (res.ok) {
+        const data = await res.json();
+        setNavLocationsList(data);
+      }
+    } catch (err) {
+      console.error('Failed to load navigation locations:', err);
+    }
+  };
+
+  const loadNavigation = async (location: string) => {
+    setLoadingNav(true);
+    setNavError(null);
+    try {
+      const res = await apiFetch(`/api/admin/navigation/${location}`);
+      if (res.ok) {
+        const data = await res.json();
+        const mappedData = data.map((item: any) => ({
+          ...item,
+          tempId: item.id,
+          parentTempId: item.parentId,
+        }));
+        setNavItems(mappedData);
+      } else {
+        setNavError('Failed to load navigation items');
+      }
+    } catch (err) {
+      console.error(err);
+      setNavError('Network error loading navigation items');
+    } finally {
+      setLoadingNav(false);
+    }
+  };
+
+  const saveNavigation = async () => {
+    setSavingNav(true);
+    setNavError(null);
+    setNavSuccess(null);
+    try {
+      const res = await apiFetch(`/api/admin/navigation/${navLocation}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(navItems),
+      });
+      if (res.ok) {
+        setNavSuccess('Menu saved successfully!');
+        await loadNavigation(navLocation);
+        await loadNavigationLocations();
+      } else {
+        const data = await res.json();
+        setNavError(data.error || 'Failed to save menu');
+      }
+    } catch (err) {
+      console.error(err);
+      setNavError('Network error saving menu');
+    } finally {
+      setSavingNav(false);
+    }
+  };
+
+  const handleAddCustomLink = () => {
+    if (!newCustomLabel || !newCustomUrl) return;
+    const newItem = {
+      tempId: Date.now() + Math.random(),
+      label: newCustomLabel,
+      url: newCustomUrl,
+      target: '_self',
+      parentTempId: null,
+      sortOrder: navItems.length,
+      isActive: true,
+    };
+    setNavItems([...navItems, newItem]);
+    setNewCustomLabel('');
+    setNewCustomUrl('');
+  };
+
+  const handleAddPages = () => {
+    const newItems = selectedPages.map(pageId => {
+      const page = navPages.find(p => p.id === pageId);
+      if (!page) return null;
+      return {
+        tempId: Date.now() + Math.random(),
+        label: page.title,
+        url: `/${page.slug === 'home' ? '' : page.slug}`,
+        target: '_self',
+        parentTempId: null,
+        sortOrder: navItems.length,
+        isActive: true,
+      };
+    }).filter(Boolean);
+    setNavItems([...navItems, ...newItems]);
+    setSelectedPages([]);
+  };
+
+  const handleAddPosts = () => {
+    const newItems = selectedPosts.map(postId => {
+      const post = navPosts.find(p => p.id === postId);
+      if (!post) return null;
+      return {
+        tempId: Date.now() + Math.random(),
+        label: post.title,
+        url: `/posts/${post.slug}`,
+        target: '_self',
+        parentTempId: null,
+        sortOrder: navItems.length,
+        isActive: true,
+      };
+    }).filter(Boolean);
+    setNavItems([...navItems, ...newItems]);
+    setSelectedPosts([]);
+  };
+
+  const handleAddCategories = () => {
+    const newItems = selectedCategories.map(catId => {
+      const cat = navCategories.find(c => c.id === catId);
+      if (!cat) return null;
+      return {
+        tempId: Date.now() + Math.random(),
+        label: cat.name,
+        url: `/category/${cat.slug}`,
+        target: '_self',
+        parentTempId: null,
+        sortOrder: navItems.length,
+        isActive: true,
+      };
+    }).filter(Boolean);
+    setNavItems([...navItems, ...newItems]);
+    setSelectedCategories([]);
+  };
+
+  const handleAddTags = () => {
+    const newItems = selectedTags.map(tagId => {
+      const tag = navTags.find(t => t.id === tagId);
+      if (!tag) return null;
+      return {
+        tempId: Date.now() + Math.random(),
+        label: tag.name,
+        url: `/tag/${tag.slug}`,
+        target: '_self',
+        parentTempId: null,
+        sortOrder: navItems.length,
+        isActive: true,
+      };
+    }).filter(Boolean);
+    setNavItems([...navItems, ...newItems]);
+    setSelectedTags([]);
+  };
+
+  const moveItemUp = (index: number) => {
+    if (index === 0) return;
+    const newItems = [...navItems];
+    const temp = newItems[index];
+    newItems[index] = newItems[index - 1];
+    newItems[index - 1] = temp;
+    newItems.forEach((item, idx) => {
+      item.sortOrder = idx;
+    });
+    setNavItems(newItems);
+  };
+
+  const moveItemDown = (index: number) => {
+    if (index === navItems.length - 1) return;
+    const newItems = [...navItems];
+    const temp = newItems[index];
+    newItems[index] = newItems[index + 1];
+    newItems[index + 1] = temp;
+    newItems.forEach((item, idx) => {
+      item.sortOrder = idx;
+    });
+    setNavItems(newItems);
+  };
+
+  const indentItem = (index: number) => {
+    if (index === 0) return;
+    const newItems = [...navItems];
+    const prevItem = newItems[index - 1];
+    newItems[index].parentTempId = prevItem.tempId;
+    setNavItems(newItems);
+  };
+
+  const outdentItem = (index: number) => {
+    const newItems = [...navItems];
+    const currentItem = newItems[index];
+    if (!currentItem.parentTempId) return;
+    const parentItem = newItems.find(item => item.tempId === currentItem.parentTempId);
+    currentItem.parentTempId = parentItem ? parentItem.parentTempId : null;
+    setNavItems(newItems);
+  };
+
+  const removeItem = (index: number) => {
+    const newItems = [...navItems];
+    const itemToRemove = newItems[index];
+    newItems.splice(index, 1);
+    newItems.forEach(item => {
+      if (item.parentTempId === itemToRemove.tempId) {
+        item.parentTempId = itemToRemove.parentTempId;
+      }
+    });
+    newItems.forEach((item, idx) => {
+      item.sortOrder = idx;
+    });
+    setNavItems(newItems);
+  };
+
+  const getItemDepth = (item: any, items: any[]): number => {
+    let depth = 0;
+    let current = item;
+    const seen = new Set();
+    while (current.parentTempId) {
+      if (seen.has(current.tempId)) break;
+      seen.add(current.tempId);
+      const parent = items.find(i => i.tempId === current.parentTempId);
+      if (!parent) break;
+      depth++;
+      current = parent;
+    }
+    return depth;
+  };
+
+  const toggleAccordion = (key: string) => {
+    setAccordionState(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
   const parsePath = (path: string) => {
     const cleanPath = path
                         .replace(/^\/admin/, '')
@@ -129,6 +555,12 @@ export default function App() {
     if (cleanPath === 'categories') return { route: 'categories', subView: 'list' };
     if (cleanPath === 'tags') return { route: 'tags', subView: 'list' };
     if (cleanPath === 'pages') return { route: 'pages', subView: 'list' };
+    if (cleanPath === 'pages/new') return { route: 'pages', subView: 'create' };
+    const pageEditMatch = cleanPath.match(/^pages\/([^/]+)\/edit$/);
+    if (pageEditMatch) {
+      const pageId = Number.parseInt(pageEditMatch[1], 10);
+      return { route: 'pages', subView: 'edit', pageId: Number.isFinite(pageId) ? pageId : null };
+    }
     if (cleanPath === 'themes') return { route: 'themes', subView: 'list' };
     if (cleanPath === 'plugins') return { route: 'plugins', subView: 'list' };
     if (cleanPath === 'users') return { route: 'users', subView: 'list' };
@@ -175,6 +607,12 @@ export default function App() {
       }
     }
   }, [user, currentRoute]);
+
+  useEffect(() => {
+    if (currentRoute === 'themes' && user) {
+      loadThemes();
+    }
+  }, [currentRoute]);
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -408,6 +846,9 @@ export default function App() {
           if (parsed.route === 'posts') {
             setPostsSubView(parsed.subView as any);
             setEditingPostRouteId(parsed.subView === 'edit' ? parsed.postId ?? null : null);
+          } else if (parsed.route === 'pages') {
+            setPagesSubView(parsed.subView as any);
+            setEditingPageRouteId(parsed.subView === 'edit' ? (parsed as any).pageId ?? null : null);
           }
         }
       } else {
@@ -423,6 +864,124 @@ export default function App() {
       window.history.replaceState(null, '', '/login');
     } finally {
       setAuthChecking(false);
+    }
+  };
+
+  const hasPermission = (permissionKey: string): boolean => {
+    if (!user) return false;
+    if (user.roles?.includes('Admin')) return true;
+    if (!user.permissions) return false;
+    if (user.permissions.includes(permissionKey)) return true;
+    return user.permissions.some(userPerm => {
+      if (userPerm === '*') return true;
+      if (userPerm.endsWith('.*')) {
+        const prefix = userPerm.slice(0, -2);
+        return permissionKey.startsWith(prefix + '.');
+      }
+      return false;
+    });
+  };
+
+  const loadUsersAndRoles = async () => {
+    setLoadingUsers(true);
+    setUsersError(null);
+    try {
+      const [usersRes, rolesRes] = await Promise.all([
+        apiFetch('/api/users'),
+        apiFetch('/api/roles'),
+      ]);
+      if (usersRes.ok && rolesRes.ok) {
+        const usersData = await usersRes.json();
+        const rolesData = await rolesRes.json();
+        setUsersList(usersData);
+        setRolesList(rolesData);
+      } else {
+        setUsersError('Failed to fetch users or roles from API.');
+      }
+    } catch (err) {
+      console.error(err);
+      setUsersError('Network error loading users.');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user && currentRoute === 'users') {
+      loadUsersAndRoles();
+    }
+  }, [user, currentRoute]);
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userFormUsername || !userFormEmail || (!editingUser && !userFormPassword) || !userFormRoleId) {
+      setUsersError('Please fill in all required fields.');
+      return;
+    }
+    
+    setUserFormSubmitting(true);
+    setUsersError(null);
+    setUsersSuccess(null);
+    
+    try {
+      const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users';
+      const method = editingUser ? 'PUT' : 'POST';
+      const body: any = {
+        username: userFormUsername,
+        email: userFormEmail,
+        roleId: Number(userFormRoleId),
+        status: userFormStatus,
+      };
+      if (userFormPassword) {
+        body.password = userFormPassword;
+      }
+      
+      const response = await apiFetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      
+      if (response.ok) {
+        setUsersSuccess(editingUser ? 'User updated successfully!' : 'User created successfully!');
+        setUserModalOpen(false);
+        setUserFormUsername('');
+        setUserFormEmail('');
+        setUserFormPassword('');
+        setUserFormRoleId('');
+        setUserFormStatus('active');
+        setEditingUser(null);
+        await loadUsersAndRoles();
+      } else {
+        const errorData = await response.json();
+        setUsersError(errorData.error || 'Failed to save user.');
+      }
+    } catch (err) {
+      console.error(err);
+      setUsersError('Network error saving user.');
+    } finally {
+      setUserFormSubmitting(false);
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    setUsersError(null);
+    setUsersSuccess(null);
+    try {
+      const response = await apiFetch(`/api/users/${id}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setUsersSuccess('User deleted successfully!');
+        await loadUsersAndRoles();
+      } else {
+        const errorData = await response.json();
+        setUsersError(errorData.error || 'Failed to delete user.');
+      }
+    } catch (err) {
+      console.error(err);
+      setUsersError('Network error deleting user.');
     }
   };
 
@@ -475,6 +1034,113 @@ export default function App() {
     }
   }, [user]);
 
+  // Hydrate settings states when publicSettings is fetched/updated
+  useEffect(() => {
+    if (publicSettings.length > 0) {
+      setHomepageMode(getSettingValue('site.homepage_mode', 'single'));
+      setHomepageTarget(getSettingValue('site.homepage_target', ''));
+      setPostsPageTarget(getSettingValue('site.posts_page_target', ''));
+      setPostsPerPage(parseInt(getSettingValue('site.posts_per_page', '10'), 10) || 10);
+      setPermalinkStructure(getSettingValue('site.permalink_structure', '/posts/%postname%/'));
+    }
+  }, [publicSettings]);
+
+  // Load menu resources (pages list) when settings view is entered
+  useEffect(() => {
+    if (user) {
+      if (currentRoute === 'settings') {
+        loadMenuResources();
+      }
+    }
+  }, [user, currentRoute]);
+
+  const handleSaveReadingSettings = async () => {
+    setSavingSettings(true);
+    setSettingsSuccess(null);
+    setSettingsError(null);
+    try {
+      const payloadMode = {
+        value: homepageMode,
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+        description: 'Homepage rendering mode (single page or collection list)',
+      };
+      
+      const payloadTarget = {
+        value: homepageTarget,
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+        description: 'Active homepage content UUID',
+      };
+      
+      const payloadPostsTarget = {
+        value: postsPageTarget,
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+        description: 'Active posts page content UUID when homepage displays a static page',
+      };
+      
+      const payloadPerPage = {
+        value: String(postsPerPage),
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+        description: 'Number of posts to display per page on collection list',
+      };
+
+      const payloadPermalink = {
+        value: permalinkStructure,
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+        description: 'Permalink structure for articles/posts',
+      };
+
+      const [resMode, resTarget, resPostsTarget, resPerPage, resPermalink] = await Promise.all([
+        apiFetch('/api/admin/settings/site.homepage_mode', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadMode),
+        }),
+        apiFetch('/api/admin/settings/site.homepage_target', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadTarget),
+        }),
+        apiFetch('/api/admin/settings/site.posts_page_target', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadPostsTarget),
+        }),
+        apiFetch('/api/admin/settings/site.posts_per_page', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadPerPage),
+        }),
+        apiFetch('/api/admin/settings/site.permalink_structure', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadPermalink),
+        }),
+      ]);
+
+      if (resMode.ok && resTarget.ok && resPostsTarget.ok && resPerPage.ok && resPermalink.ok) {
+        setSettingsSuccess('Reading settings saved successfully!');
+        await fetchMetrics();
+      } else {
+        setSettingsError('Failed to save some settings.');
+      }
+    } catch (err) {
+      console.error(err);
+      setSettingsError('Network error saving settings.');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   console.log('URL_SYNC', {
   user,
   currentRoute,
@@ -505,10 +1171,18 @@ export default function App() {
     path = `/posts/${editingPostRouteId}/edit`;
   }
 
+  if (currentRoute === 'pages' && pagesSubView === 'create') {
+    path = '/pages/new';
+  }
+
+  if (currentRoute === 'pages' && pagesSubView === 'edit' && editingPageRouteId) {
+    path = `/pages/${editingPageRouteId}/edit`;
+  }
+
   if (window.location.pathname !== path) {
     window.history.pushState(null, '', path);
   }
-}, [currentRoute, postsSubView, editingPostRouteId, user, authChecking]);
+}, [currentRoute, postsSubView, editingPostRouteId, pagesSubView, editingPageRouteId, user, authChecking]);
 
   // Handle popstate (browser back/forward button clicks)
   useEffect(() => {
@@ -523,6 +1197,9 @@ export default function App() {
           if (parsed.route === 'posts') {
             setPostsSubView(parsed.subView as any);
             setEditingPostRouteId(parsed.subView === 'edit' ? parsed.postId ?? null : null);
+          } else if (parsed.route === 'pages') {
+            setPagesSubView(parsed.subView as any);
+            setEditingPageRouteId(parsed.subView === 'edit' ? (parsed as any).pageId ?? null : null);
           }
         }
       } else {
@@ -558,6 +1235,15 @@ export default function App() {
       window.history.replaceState(null, '', '/dashboard');
     }
   }, [user, currentRoute]);
+
+  // Load menu resources and items when entering navigation route
+  useEffect(() => {
+    if (currentRoute === 'navigation' && user) {
+      loadNavigation(navLocation);
+      loadNavigationLocations();
+      loadMenuResources();
+    }
+  }, [currentRoute, navLocation, user]);
 
   const handleLogout = async () => {
     try {
@@ -619,6 +1305,7 @@ export default function App() {
 
   return (
     <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-is-collapsed' : 'sidebar-is-expanded'}`}>
+      <AdminMediaPickerHost />
       {/* Sidebar Navigation */}
       <aside className="admin-sidebar" data-sidebar-state={sidebarCollapsed ? 'collapsed' : 'expanded'}>
         <div className="sidebar-brand">
@@ -639,7 +1326,14 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="sidebar-nav">
+        <nav
+          className="sidebar-nav"
+          onClick={(event) => {
+            if (mobileNavigation && (event.target as HTMLElement).closest('button.nav-item')) {
+              setSidebarCollapsed(true);
+            }
+          }}
+        >
           <div className="nav-section-label">Main</div>
           <button 
             className={`nav-item ${currentRoute === 'dashboard' ? 'active' : ''}`}
@@ -650,154 +1344,169 @@ export default function App() {
             <span className="nav-icon"><LayoutDashboard className="lucide-icon" size={18} /></span> Dashboard
           </button>
 
-          <div className="nav-section-label">Content</div>
-          <div 
-            className={`nav-group clickable ${['posts', 'categories', 'tags'].includes(currentRoute) ? 'active' : ''}`}
-            role="button"
-            tabIndex={0}
-            aria-label="Articles"
-            title="Articles"
-            onClick={() => {
-              if (sidebarCollapsed) {
-                setCurrentRoute('posts');
-                setPostsSubView('list');
-                return;
-              }
-              setArticlesExpanded(!articlesExpanded);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                if (sidebarCollapsed) {
-                  setCurrentRoute('posts');
-                  setPostsSubView('list');
-                  return;
-                }
-                setArticlesExpanded(!articlesExpanded);
-              }
-            }}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-          >
-            <span className="nav-group-icon"><FileText className="lucide-icon" size={18} /></span>
-            <span>Articles</span>
-            {articlesExpanded ? <ChevronDown size={14} className="lucide-icon chevron-toggle" /> : <ChevronRight size={14} className="lucide-icon chevron-toggle" />}
-          </div>
-          {articlesExpanded && !sidebarCollapsed && (
+          {hasPermission('content.read') && (
             <>
-              <button 
-                className={`nav-item nav-sub-item ${currentRoute === 'posts' && postsSubView === 'list' ? 'active' : ''}`}
-                aria-label="All Articles"
-                title="All Articles"
+              <div className="nav-section-label">Content</div>
+              <div 
+                className={`nav-group clickable ${['posts', 'categories', 'tags'].includes(currentRoute) ? 'active' : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-label="Articles"
+                title="Articles"
                 onClick={() => {
-                  setCurrentRoute('posts');
-                  setPostsSubView('list');
-                  setEditingPostRouteId(null);
+                  if (sidebarCollapsed) {
+                    setCurrentRoute('posts');
+                    setPostsSubView('list');
+                    return;
+                  }
+                  setArticlesExpanded(!articlesExpanded);
                 }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    if (sidebarCollapsed) {
+                      setCurrentRoute('posts');
+                      setPostsSubView('list');
+                      return;
+                    }
+                    setArticlesExpanded(!articlesExpanded);
+                  }
+                }}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
               >
-                <span className="nav-icon"><FileText className="lucide-icon" size={14} /></span> All Articles
-              </button>
-              <button 
-                className={`nav-item nav-sub-item ${currentRoute === 'posts' && postsSubView === 'create' ? 'active' : ''}`}
-                aria-label="New Article"
-                title="New Article"
+                <span className="nav-group-icon"><FileText className="lucide-icon" size={18} /></span>
+                <span>Articles</span>
+                {articlesExpanded ? <ChevronDown size={14} className="lucide-icon chevron-toggle" /> : <ChevronRight size={14} className="lucide-icon chevron-toggle" />}
+              </div>
+              {articlesExpanded && !sidebarCollapsed && (
+                <>
+                  <button 
+                    className={`nav-item nav-sub-item ${currentRoute === 'posts' && postsSubView === 'list' ? 'active' : ''}`}
+                    aria-label="All Articles"
+                    title="All Articles"
+                    onClick={() => {
+                      setCurrentRoute('posts');
+                      setPostsSubView('list');
+                      setEditingPostRouteId(null);
+                    }}
+                  >
+                    <span className="nav-icon"><FileText className="lucide-icon" size={14} /></span> All Articles
+                  </button>
+                  {hasPermission('content.create') && (
+                    <button 
+                      className={`nav-item nav-sub-item ${currentRoute === 'posts' && postsSubView === 'create' ? 'active' : ''}`}
+                      aria-label="New Article"
+                      title="New Article"
+                      onClick={() => {
+                        setCurrentRoute('posts');
+                        setPostsSubView('create');
+                        setEditingPostRouteId(null);
+                      }}
+                    >
+                      <span className="nav-icon"><Plus className="lucide-icon" size={14} /></span> New Article
+                    </button>
+                  )}
+                  <button 
+                    className={`nav-item nav-sub-item ${currentRoute === 'categories' ? 'active' : ''}`}
+                    aria-label="Categories"
+                    title="Categories"
+                    onClick={() => {
+                      setCurrentRoute('categories');
+                      cancelEditTaxonomy();
+                      loadTaxonomy();
+                    }}
+                  >
+                    <span className="nav-icon"><Folder className="lucide-icon" size={14} /></span> Categories
+                  </button>
+                  <button 
+                    className={`nav-item nav-sub-item ${currentRoute === 'tags' ? 'active' : ''}`}
+                    aria-label="Tags"
+                    title="Tags"
+                    onClick={() => {
+                      setCurrentRoute('tags');
+                      cancelEditTaxonomy();
+                      loadTaxonomy();
+                    }}
+                  >
+                    <span className="nav-icon"><Tag className="lucide-icon" size={14} /></span> Tags
+                  </button>
+                </>
+              )}
+
+              <div 
+                className={`nav-group clickable ${currentRoute === 'pages' ? 'active' : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-label="Pages"
+                title="Pages"
                 onClick={() => {
-                  // Ganti initNewPost() dengan ini:
-                  setCurrentRoute('posts');
-                  setPostsSubView('create');
-                  setEditingPostRouteId(null);
+                  if (sidebarCollapsed) {
+                    setCurrentRoute('pages');
+                    setPagesSubView('list');
+                    return;
+                  }
+                  setPagesExpanded(!pagesExpanded);
                 }}
-              >
-                <span className="nav-icon"><Plus className="lucide-icon" size={14} /></span> New Article
-              </button>
-              <button 
-                className={`nav-item nav-sub-item ${currentRoute === 'categories' ? 'active' : ''}`}
-                aria-label="Categories"
-                title="Categories"
-                onClick={() => {
-                  setCurrentRoute('categories');
-                  cancelEditTaxonomy();
-                  loadTaxonomy();
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    if (sidebarCollapsed) {
+                      setCurrentRoute('pages');
+                      setPagesSubView('list');
+                      return;
+                    }
+                    setPagesExpanded(!pagesExpanded);
+                  }
                 }}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
               >
-                <span className="nav-icon"><Folder className="lucide-icon" size={14} /></span> Categories
-              </button>
-              <button 
-                className={`nav-item nav-sub-item ${currentRoute === 'tags' ? 'active' : ''}`}
-                aria-label="Tags"
-                title="Tags"
-                onClick={() => {
-                  setCurrentRoute('tags');
-                  cancelEditTaxonomy();
-                  loadTaxonomy();
-                }}
-              >
-                <span className="nav-icon"><Tag className="lucide-icon" size={14} /></span> Tags
-              </button>
+                <span className="nav-group-icon"><Files className="lucide-icon" size={18} /></span>
+                <span>Pages</span>
+                {pagesExpanded ? <ChevronDown size={14} className="lucide-icon chevron-toggle" /> : <ChevronRight size={14} className="lucide-icon chevron-toggle" />}
+              </div>
+              {pagesExpanded && !sidebarCollapsed && (
+                <>
+                  <button 
+                    className={`nav-item nav-sub-item ${currentRoute === 'pages' && pagesSubView === 'list' ? 'active' : ''}`}
+                    aria-label="All Pages"
+                    title="All Pages"
+                    onClick={() => {
+                      setCurrentRoute('pages');
+                      setPagesSubView('list');
+                    }}
+                  >
+                    <span className="nav-icon"><Files className="lucide-icon" size={14} /></span> All Pages
+                  </button>
+                  {hasPermission('content.create') && (
+                    <button 
+                      className={`nav-item nav-sub-item ${currentRoute === 'pages' && pagesSubView === 'create' ? 'active' : ''}`}
+                      aria-label="New Page"
+                      title="New Page"
+                      onClick={() => {
+                        setCurrentRoute('pages');
+                        setPagesSubView('create');
+                      }}
+                    >
+                      <span className="nav-icon"><Plus className="lucide-icon" size={14} /></span> New Page
+                    </button>
+                  )}
+                </>
+              )}
             </>
           )}
 
-          <div 
-            className={`nav-group clickable ${currentRoute === 'pages' ? 'active' : ''}`}
-            role="button"
-            tabIndex={0}
-            aria-label="Pages"
-            title="Pages"
-            onClick={() => {
-              if (sidebarCollapsed) {
-                setCurrentRoute('pages');
-                setPagesSubView('list');
-                return;
-              }
-              setPagesExpanded(!pagesExpanded);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                if (sidebarCollapsed) {
-                  setCurrentRoute('pages');
-                  setPagesSubView('list');
-                  return;
-                }
-                setPagesExpanded(!pagesExpanded);
-              }
-            }}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-          >
-            <span className="nav-group-icon"><Files className="lucide-icon" size={18} /></span>
-            <span>Pages</span>
-            {pagesExpanded ? <ChevronDown size={14} className="lucide-icon chevron-toggle" /> : <ChevronRight size={14} className="lucide-icon chevron-toggle" />}
-          </div>
-          {pagesExpanded && !sidebarCollapsed && (
-            <>
-              <button 
-                className={`nav-item nav-sub-item ${currentRoute === 'pages' && pagesSubView === 'list' ? 'active' : ''}`}
-                aria-label="All Pages"
-                title="All Pages"
-                onClick={() => {
-                  setCurrentRoute('pages');
-                  setPagesSubView('list');
-                }}
-              >
-                <span className="nav-icon"><Files className="lucide-icon" size={14} /></span> All Pages
-              </button>
-              <button 
-                className={`nav-item nav-sub-item ${currentRoute === 'pages' && pagesSubView === 'create' ? 'active' : ''}`}
-                aria-label="New Page"
-                title="New Page"
-                onClick={() => {
-                  setCurrentRoute('pages');
-                  setPagesSubView('create');
-                }}
-              >
-                <span className="nav-icon"><Plus className="lucide-icon" size={14} /></span> New Page
-              </button>
-            </>
-          )}
-
-          {pluginManager.getMenus(pluginsList).length > 0 && (
+          {pluginManager.getMenus(pluginsList).filter(menu => {
+            const manifest = pluginsList.find(p => p.manifest?.admin?.route === menu.route)?.manifest;
+            const reqPermission = manifest?.admin?.permission || `${manifest?.id}.read`;
+            return hasPermission(reqPermission);
+          }).length > 0 && (
             <div className="nav-section-label">Plugins</div>
           )}
-          {pluginManager.getMenus(pluginsList).map(menu => {
+          {pluginManager.getMenus(pluginsList).filter(menu => {
+            const manifest = pluginsList.find(p => p.manifest?.admin?.route === menu.route)?.manifest;
+            const reqPermission = manifest?.admin?.permission || `${manifest?.id}.read`;
+            return hasPermission(reqPermission);
+          }).map(menu => {
             const IconComponent = menu.icon || Plug;
             return (
               <button
@@ -815,51 +1524,85 @@ export default function App() {
             );
           })}
 
-          <div className="nav-section-label">Platform</div>
-          <button 
-            className={`nav-item ${currentRoute === 'themes' ? 'active' : ''}`}
-            aria-label="Themes"
-            title="Themes"
-            onClick={() => setCurrentRoute('themes')}
-          >
-            <span className="nav-icon"><Palette className="lucide-icon" size={18} /></span> Themes
-          </button>
-          <button 
-            className={`nav-item ${currentRoute === 'plugins' ? 'active' : ''}`}
-            aria-label="Plugins"
-            title="Plugins"
-            onClick={() => setCurrentRoute('plugins')}
-          >
-            <span className="nav-icon"><Plug className="lucide-icon" size={18} /></span> Plugins
-          </button>
+          {(hasPermission('themes.manage') || hasPermission('settings.manage') || hasPermission('plugins.manage')) && (
+            <div className="nav-section-label">Platform</div>
+          )}
+          {hasPermission('themes.manage') && (
+            <button 
+              className={`nav-item ${currentRoute === 'themes' ? 'active' : ''}`}
+              aria-label="Themes"
+              title="Themes"
+              onClick={() => setCurrentRoute('themes')}
+            >
+              <span className="nav-icon"><Palette className="lucide-icon" size={18} /></span> Themes
+            </button>
+          )}
+          {hasPermission('themes.manage') && (
+            <button 
+              className={`nav-item ${currentRoute === 'widgets' ? 'active' : ''}`}
+              aria-label="Widgets"
+              title="Widgets"
+              onClick={() => setCurrentRoute('widgets')}
+            >
+              <span className="nav-icon"><Puzzle className="lucide-icon" size={18} /></span> Widgets
+            </button>
+          )}
+          {hasPermission('settings.manage') && (
+            <button 
+              className={`nav-item ${currentRoute === 'navigation' ? 'active' : ''}`}
+              aria-label="Menus"
+              title="Menus"
+              onClick={() => setCurrentRoute('navigation')}
+            >
+              <span className="nav-icon"><Menu className="lucide-icon" size={18} /></span> Menus
+            </button>
+          )}
+          {hasPermission('plugins.manage') && (
+            <button 
+              className={`nav-item ${currentRoute === 'plugins' ? 'active' : ''}`}
+              aria-label="Plugins"
+              title="Plugins"
+              onClick={() => setCurrentRoute('plugins')}
+            >
+              <span className="nav-icon"><Plug className="lucide-icon" size={18} /></span> Plugins
+            </button>
+          )}
 
-          <div className="nav-section-label">Access</div>
-          <button 
-            className={`nav-item ${currentRoute === 'users' ? 'active' : ''}`}
-            aria-label="Users"
-            title="Users"
-            onClick={() => setCurrentRoute('users')}
-          >
-            <span className="nav-icon"><Users className="lucide-icon" size={18} /></span> Users
-          </button>
+          {hasPermission('users.manage') && (
+            <>
+              <div className="nav-section-label">Access</div>
+              <button 
+                className={`nav-item ${currentRoute === 'users' ? 'active' : ''}`}
+                aria-label="Users"
+                title="Users"
+                onClick={() => setCurrentRoute('users')}
+              >
+                <span className="nav-icon"><Users className="lucide-icon" size={18} /></span> Users
+              </button>
+            </>
+          )}
 
-          <div className="nav-section-label">Operations</div>
-          <button 
-            className={`nav-item ${currentRoute === 'settings' ? 'active' : ''}`}
-            aria-label="Settings"
-            title="Settings"
-            onClick={() => setCurrentRoute('settings')}
-          >
-            <span className="nav-icon"><Settings className="lucide-icon" size={18} /></span> Settings
-          </button>
-          <button 
-            className={`nav-item ${currentRoute === 'analytics' ? 'active' : ''}`}
-            aria-label="Analytics"
-            title="Analytics"
-            onClick={() => setCurrentRoute('analytics')}
-          >
-            <span className="nav-icon"><ChartLine className="lucide-icon" size={18} /></span> Analytics
-          </button>
+          {hasPermission('settings.manage') && (
+            <>
+              <div className="nav-section-label">Operations</div>
+              <button 
+                className={`nav-item ${currentRoute === 'settings' ? 'active' : ''}`}
+                aria-label="Settings"
+                title="Settings"
+                onClick={() => setCurrentRoute('settings')}
+              >
+                <span className="nav-icon"><Settings className="lucide-icon" size={18} /></span> Settings
+              </button>
+              <button 
+                className={`nav-item ${currentRoute === 'analytics' ? 'active' : ''}`}
+                aria-label="Analytics"
+                title="Analytics"
+                onClick={() => setCurrentRoute('analytics')}
+              >
+                <span className="nav-icon"><ChartLine className="lucide-icon" size={18} /></span> Analytics
+              </button>
+            </>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -867,7 +1610,7 @@ export default function App() {
             <Circle className="status-icon healthy" size={8} fill="currentColor" />
             <span>Production Mode</span>
           </div>
-          <a href="http://localhost:5173" target="_blank" rel="noreferrer" className="btn-view-site" title="View Site" aria-label="View Site">
+          <a href={getSettingValue('system.site_url', 'http://localhost:5174')} target="_blank" rel="noreferrer" className="btn-view-site" title="View Site" aria-label="View Site">
             <Globe className="lucide-icon" size={16} />
             <span>View Site</span>
             <ExternalLink className="lucide-icon external-link-icon" size={14} />
@@ -875,10 +1618,28 @@ export default function App() {
         </div>
       </aside>
 
+      {mobileNavigation && !sidebarCollapsed && (
+        <button
+          type="button"
+          className="mobile-sidebar-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
+
       {/* Main Panel Wrapper */}
       <div className="admin-main">
         {/* Topbar */}
         <header className="admin-topbar">
+          <button
+            type="button"
+            className="mobile-menu-button"
+            aria-label="Open navigation"
+            aria-expanded={!sidebarCollapsed}
+            onClick={() => setSidebarCollapsed(false)}
+          >
+            <Menu className="lucide-icon" size={20} />
+          </button>
           <div className="topbar-search">
             <span className="search-icon">🔍</span>
             <Search className="lucide-icon topbar-search-icon" size={18} />
@@ -924,9 +1685,43 @@ export default function App() {
 
         {/* Content Area */}
         <main className="admin-content-viewport">
-          
-          {/* 1. DASHBOARD VIEW */}
-          {currentRoute === 'dashboard' && (
+          {(() => {
+            const routePermissionsMap: Record<string, string> = {
+              posts: 'content.read',
+              categories: 'content.read',
+              tags: 'content.read',
+              pages: 'content.read',
+              themes: 'themes.manage',
+              widgets: 'themes.manage',
+              navigation: 'settings.manage',
+              plugins: 'plugins.manage',
+              users: 'users.manage',
+              settings: 'settings.manage',
+              analytics: 'settings.manage',
+              media: 'media.read',
+            };
+
+            if (currentRoute !== 'dashboard' && currentRoute !== 'login' && routePermissionsMap[currentRoute] && !hasPermission(routePermissionsMap[currentRoute])) {
+              return (
+                <div className="route-view forbidden-view" style={{ display: 'flex', flex: 1, height: '100%', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
+                  <div className="card glass placeholder-container" style={{ textAlign: 'center', maxWidth: '400px', padding: '3rem' }}>
+                    <span className="p-icon" style={{ fontSize: '3rem', display: 'block', marginBottom: '1.5rem' }}>🚫</span>
+                    <h3 style={{ marginBottom: '0.75rem', fontSize: '1.5rem', fontWeight: 600 }}>Akses Ditolak</h3>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '0.95rem', lineHeight: 1.5 }}>
+                      Anda tidak memiliki izin yang diperlukan untuk mengakses fitur atau halaman ini.
+                    </p>
+                    <button className="btn-primary" onClick={() => setCurrentRoute('dashboard')}>
+                      Kembali ke Dashboard
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <>
+                {/* 1. DASHBOARD VIEW */}
+                {currentRoute === 'dashboard' && (
             <div className="route-view dashboard-view">
               <div className="view-header">
                 <h2>Dashboard Overview</h2>
@@ -1077,7 +1872,7 @@ export default function App() {
                       <span>Install Plugin</span>
                       <span className="q-badge-soon">Coming Soon</span>
                     </button>
-                    <a href="http://localhost:5173" target="_blank" rel="noreferrer" className="q-btn-link">
+                    <a href={getSettingValue('system.site_url', 'http://localhost:5174')} target="_blank" rel="noreferrer" className="q-btn-link">
                       <span className="q-icon">🌐</span>
                       <span>View Site</span>
                       <span className="q-badge">Public</span>
@@ -1147,99 +1942,22 @@ export default function App() {
 
           {/* 2. PAGES VIEW */}
           {currentRoute === 'pages' && (
-            <div className="route-view pages-view">
-              <div className="view-header-with-action">
-                <div className="header-text">
-                  <h2>Pages</h2>
-                  <p>Manage static pages like Home, About, Contact, and Privacy Policy.</p>
-                </div>
-                <button className="btn-primary-action">➕ New Page</button>
-              </div>
-
-              <div className="table-filter-bar glass">
-                <div className="filter-left">
-                  <input type="text" placeholder="Search pages..." className="search-filter-input" />
-                  <select className="filter-select">
-                    <option value="all">All Statuses</option>
-                    <option value="published">Published</option>
-                    <option value="draft">Draft</option>
-                    <option value="trash">Trash</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="card glass no-padding">
-                <div className="table-container">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Title</th>
-                        <th>Slug</th>
-                        <th>Status</th>
-                        <th>Author</th>
-                        <th>Updated At</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td><span className="title-bold">Homepage</span></td>
-                        <td><code>/</code></td>
-                        <td><span className="status-badge published">Published</span></td>
-                        <td>{user.username}</td>
-                        <td>May 28, 2026</td>
-                        <td className="table-actions">
-                          <button className="t-action-btn">Edit</button>
-                          <button className="t-action-btn">View</button>
-                          <button className="t-action-btn danger">Delete</button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td><span className="title-bold">About Us</span></td>
-                        <td><code>/about</code></td>
-                        <td><span className="status-badge published">Published</span></td>
-                        <td>John Editor</td>
-                        <td>May 27, 2026</td>
-                        <td className="table-actions">
-                          <button className="t-action-btn">Edit</button>
-                          <button className="t-action-btn">View</button>
-                          <button className="t-action-btn danger">Delete</button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td><span className="title-bold">Contact Page</span></td>
-                        <td><code>/contact</code></td>
-                        <td><span className="status-badge published">Published</span></td>
-                        <td>{user.username}</td>
-                        <td>May 25, 2026</td>
-                        <td className="table-actions">
-                          <button className="t-action-btn">Edit</button>
-                          <button className="t-action-btn">View</button>
-                          <button className="t-action-btn danger">Delete</button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td><span className="title-bold">Privacy Policy</span></td>
-                        <td><code>/privacy-policy</code></td>
-                        <td><span className="status-badge draft">Draft</span></td>
-                        <td>{user.username}</td>
-                        <td>May 20, 2026</td>
-                        <td className="table-actions">
-                          <button className="t-action-btn">Edit</button>
-                          <button className="t-action-btn">Preview</button>
-                          <button className="t-action-btn danger">Delete</button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <ContentManager 
+              user={user} 
+              apiFetch={apiFetch} 
+              pluginsList={pluginsList}
+              postsSubView={pagesSubView} 
+              setPostsSubView={setPagesSubView} 
+              setCurrentRoute={setCurrentRoute}
+              editingPostRouteId={editingPageRouteId}
+              setEditingPostRouteId={setEditingPageRouteId}
+              contentType="page"
+            />
           )}
 
           {/* 3. POSTS VIEW */}
           {currentRoute === 'posts' && (
-              <ArticleManager 
+              <ContentManager 
                 user={user} 
                 apiFetch={apiFetch} 
                 pluginsList={pluginsList}
@@ -1248,6 +1966,7 @@ export default function App() {
                 setCurrentRoute={setCurrentRoute}
                 editingPostRouteId={editingPostRouteId}
                 setEditingPostRouteId={setEditingPostRouteId}
+                contentType="article"
               />
           )}
 
@@ -1622,7 +2341,9 @@ export default function App() {
 
             return (
               <div className="route-view plugin-view">
-                <Component apiFetch={apiFetch} />
+                <PluginErrorBoundary pluginId={pluginRoute.id}>
+                  <Component apiFetch={apiFetch} />
+                </PluginErrorBoundary>
               </div>
             );
           })()}
@@ -1630,58 +2351,621 @@ export default function App() {
           {/* 5. THEMES VIEW */}
           {currentRoute === 'themes' && (
             <div className="route-view themes-view">
-              <div className="view-header">
-                <h2>Themes</h2>
-                <p>Select and customize the active presentation template for your public site.</p>
+              <div className="view-header-with-action">
+                <div className="header-text">
+                  <h2>Themes</h2>
+                  <p>Manage the visual presentation of your public website.</p>
+                </div>
+                <button className="btn-primary-action" onClick={handleScanThemes}>
+                  <Palette className="lucide-icon" size={18} /> Scan Themes
+                </button>
               </div>
 
-              <div className="themes-layout-split">
-                <div className="active-theme-section">
-                  <h3>Active Theme</h3>
-                  <div className="theme-banner-card glass">
-                    <div className="theme-preview-mock"><Brush className="lucide-icon" size={28} /></div>
-                    <div className="theme-meta-details">
-                      <h4>Default Minimalist Theme <span className="theme-badge-active">ACTIVE</span></h4>
-                      <p className="theme-desc">A clean, modern, and high-performance minimalist theme for blogs and pages.</p>
-                      <div className="theme-metadata-row">
-                        <span>Version 1.0.0</span>
-                        <span>By Modern CMS Team</span>
+              {themesError && (
+                <div className="tax-message error" style={{ marginBottom: '1.5rem' }}>
+                  <AlertCircle size={16} />
+                  <span>{themesError}</span>
+                </div>
+              )}
+
+              {themesSuccess && (
+                <div className="tax-message success" style={{ marginBottom: '1.5rem' }}>
+                  <CheckCircle size={16} />
+                  <span>{themesSuccess}</span>
+                </div>
+              )}
+
+              {loadingThemes ? (
+                <div className="placeholder-container glass">
+                  <Loader2 className="animate-spin" size={28} />
+                  <p>Loading themes...</p>
+                </div>
+              ) : themesList.length === 0 ? (
+                <div className="placeholder-container glass">
+                  <Palette className="lucide-icon" size={28} />
+                  <h3>No Themes Found</h3>
+                  <p>Place theme directories in the <code>themes/</code> folder with a valid <code>theme.json</code> manifest.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Active Theme Section */}
+                  {(() => {
+                    const activeTheme = themesList.find(t => t.status === 'active');
+                    if (!activeTheme) return (
+                      <div className="card glass" style={{ marginBottom: '2rem', padding: '1.5rem' }}>
+                        <h3 style={{ marginBottom: '0.5rem' }}>No Active Theme</h3>
+                        <p style={{ color: 'var(--text-muted)' }}>Activate a theme below to control the public website presentation.</p>
                       </div>
-                      <div className="theme-actions">
-                        <button className="btn-primary-action">Customize Theme</button>
+                    );
+                    const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4000';
+                    return (
+                      <div className="active-theme-section" style={{ marginBottom: '2rem' }}>
+                        <h3 style={{ marginBottom: '1rem' }}>Active Theme</h3>
+                        <div className="theme-banner-card glass">
+                          <div className="theme-preview-mock" style={{ overflow: 'hidden', background: 'var(--bg-elevated)' }}>
+                            <img
+                              src={`${apiUrl}/api/admin/themes/${activeTheme.id}/screenshot`}
+                              alt={activeTheme.name}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                                (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;height:100%"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/></svg></span>';
+                              }}
+                            />
+                          </div>
+                          <div className="theme-meta-details">
+                            <h4>{activeTheme.name} <span className="theme-badge-active">ACTIVE</span></h4>
+                            <p className="theme-desc">{activeTheme.manifest?.description || 'No description available.'}</p>
+                            <div className="theme-metadata-row">
+                              <span>Version {activeTheme.version}</span>
+                              {activeTheme.manifest?.author && <span>By {activeTheme.manifest.author}</span>}
+                            </div>
+                            <div className="theme-actions" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                className="btn-primary-action"
+                                onClick={() => {
+                                  setCurrentRoute('theme-settings');
+                                  setThemeSettingsId(activeTheme.id);
+                                }}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+                              >
+                                <Palette size={14} /> Customize
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
+                    );
+                  })()}
+
+                  {/* Available (Inactive) Themes */}
+                  {(() => {
+                    const inactiveThemes = themesList.filter(t => t.status === 'inactive');
+                    if (inactiveThemes.length === 0) return null;
+                    const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4000';
+                    return (
+                      <div className="available-themes-section" style={{ marginBottom: '2rem' }}>
+                        <h3 style={{ marginBottom: '1rem' }}>Available Themes</h3>
+                        <div className="available-themes-grid">
+                          {inactiveThemes.map(theme => (
+                            <div key={theme.id} className="theme-card glass">
+                              <div className="theme-card-preview" style={{ overflow: 'hidden', background: 'var(--bg-elevated)' }}>
+                                <img
+                                  src={`${apiUrl}/api/admin/themes/${theme.id}/screenshot`}
+                                  alt={theme.name}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/></svg></span>';
+                                  }}
+                                />
+                              </div>
+                              <div className="theme-card-body">
+                                <h5>{theme.name}</h5>
+                                <p>{theme.manifest?.description || 'No description.'}</p>
+                                <div className="theme-card-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                                  <button
+                                    className="t-btn-act"
+                                    onClick={() => handleActivateTheme(theme.id)}
+                                    disabled={activatingTheme === theme.id}
+                                    style={{ flex: 1 }}
+                                  >
+                                    {activatingTheme === theme.id ? <><Loader2 size={14} className="animate-spin" /> Activating...</> : 'Activate'}
+                                  </button>
+                                  <button
+                                    className="t-action-btn"
+                                    onClick={() => {
+                                      setCurrentRoute('theme-settings');
+                                      setThemeSettingsId(theme.id);
+                                    }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+                                  >
+                                    <Palette size={14} /> Customize
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Broken Themes */}
+                  {(() => {
+                    const brokenThemes = themesList.filter(t => t.status === 'broken');
+                    if (brokenThemes.length === 0) return null;
+                    return (
+                      <div className="broken-themes-section">
+                        <h3 style={{ marginBottom: '1rem', color: 'var(--color-danger, #e74c3c)' }}>Broken Themes</h3>
+                        {brokenThemes.map(theme => (
+                          <div key={theme.id} className="card glass" style={{ marginBottom: '0.75rem', padding: '1rem', borderLeft: '3px solid var(--color-danger, #e74c3c)' }}>
+                            <strong>{theme.id}</strong>
+                            <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0' }}>{theme.error || 'Invalid theme manifest'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* 7. MENUS / NAVIGATION VIEW */}
+          {currentRoute === 'navigation' && (
+            <div className="route-view navigation-view">
+              <div className="view-header-with-action">
+                <div className="header-text">
+                  <h2>Menu Management</h2>
+                  <p>Configure and organize your website's navigation menus.</p>
+                </div>
+                <button 
+                  className="btn-primary-action" 
+                  onClick={() => {
+                    setCustomLocationName('');
+                    setShowCustomLocationModal(true);
+                  }}
+                >
+                  ➕ Create New Location
+                </button>
+              </div>
+
+              {/* Custom Location Modal */}
+              {showCustomLocationModal && (
+                <div className="modal-backdrop glass-blur" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="card glass modal-content" style={{ maxWidth: '400px', width: '90%', padding: '2rem' }}>
+                    <h3>Create Menu Location</h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                      Enter a location key (e.g., <code>header-top</code>, <code>sidebar</code>) to assign menus to.
+                    </p>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. sidebar" 
+                      className="search-filter-input"
+                      style={{ width: '100%', marginBottom: '1.5rem', boxSizing: 'border-box' }}
+                      value={customLocationName}
+                      onChange={(e) => setCustomLocationName(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))}
+                    />
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                      <button className="t-action-btn" onClick={() => setShowCustomLocationModal(false)}>Cancel</button>
+                      <button 
+                        className="btn-primary-action"
+                        onClick={() => {
+                          if (customLocationName.trim()) {
+                            if (!navLocationsList.includes(customLocationName)) {
+                              setNavLocationsList([...navLocationsList, customLocationName]);
+                            }
+                            setNavLocation(customLocationName);
+                            setShowCustomLocationModal(false);
+                          }
+                        }}
+                      >
+                        Create
+                      </button>
                     </div>
                   </div>
                 </div>
+              )}
 
-                <div className="available-themes-section">
-                  <h3>Available Templates</h3>
-                  <div className="available-themes-grid">
-                    <div className="theme-card glass">
-                      <div className="theme-card-preview">📰</div>
-                      <div className="theme-card-body">
-                        <h5>Grid Blog Theme</h5>
-                        <p>A multi-column grid layout best suited for content publishers.</p>
-                        <div className="theme-card-actions">
-                          <button className="t-btn-act">Activate</button>
-                          <button className="t-btn-act sec">Preview</button>
+              {navError && (
+                <div className="tax-message error" style={{ marginBottom: '1.5rem' }}>
+                  <AlertCircle size={16} />
+                  <span>{navError}</span>
+                </div>
+              )}
+
+              {navSuccess && (
+                <div className="tax-message success" style={{ marginBottom: '1.5rem' }}>
+                  <CheckCircle size={16} />
+                  <span>{navSuccess}</span>
+                </div>
+              )}
+
+              <div className="themes-layout-split" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '2rem' }}>
+                
+                {/* LEFT COLUMN: ADD ITEMS */}
+                <div className="navigation-add-items" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>Add Menu Items</h3>
+
+                  {/* 1. PAGES ACCORDION */}
+                  <div className="card glass" style={{ padding: '1rem' }}>
+                    <div 
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontWeight: 'bold' }}
+                      onClick={() => toggleAccordion('pages')}
+                    >
+                      <span>Pages</span>
+                      {accordionState.pages ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </div>
+                    {accordionState.pages && (
+                      <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '0.25rem' }}>
+                          {navPages.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No pages found.</p>
+                          ) : (
+                            navPages.map(page => (
+                              <label key={page.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedPages.includes(page.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedPages([...selectedPages, page.id]);
+                                    } else {
+                                      setSelectedPages(selectedPages.filter(id => id !== page.id));
+                                    }
+                                  }}
+                                />
+                                <span>{page.title}</span>
+                              </label>
+                            ))
+                          )}
                         </div>
+                        <button 
+                          className="t-btn-act" 
+                          style={{ width: '100%', marginTop: '0.5rem' }}
+                          disabled={selectedPages.length === 0}
+                          onClick={handleAddPages}
+                        >
+                          Add to Menu
+                        </button>
                       </div>
+                    )}
+                  </div>
+
+                  {/* 2. ARTICLES ACCORDION */}
+                  <div className="card glass" style={{ padding: '1rem' }}>
+                    <div 
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontWeight: 'bold' }}
+                      onClick={() => toggleAccordion('posts')}
+                    >
+                      <span>Articles</span>
+                      {accordionState.posts ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </div>
+                    {accordionState.posts && (
+                      <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '0.25rem' }}>
+                          {navPosts.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No articles found.</p>
+                          ) : (
+                            navPosts.map(post => (
+                              <label key={post.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedPosts.includes(post.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedPosts([...selectedPosts, post.id]);
+                                    } else {
+                                      setSelectedPosts(selectedPosts.filter(id => id !== post.id));
+                                    }
+                                  }}
+                                />
+                                <span>{post.title}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                        <button 
+                          className="t-btn-act" 
+                          style={{ width: '100%', marginTop: '0.5rem' }}
+                          disabled={selectedPosts.length === 0}
+                          onClick={handleAddPosts}
+                        >
+                          Add to Menu
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. CATEGORIES ACCORDION */}
+                  <div className="card glass" style={{ padding: '1rem' }}>
+                    <div 
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontWeight: 'bold' }}
+                      onClick={() => toggleAccordion('categories')}
+                    >
+                      <span>Categories</span>
+                      {accordionState.categories ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </div>
+                    {accordionState.categories && (
+                      <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '0.25rem' }}>
+                          {navCategories.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No categories found.</p>
+                          ) : (
+                            navCategories.map(cat => (
+                              <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedCategories.includes(cat.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedCategories([...selectedCategories, cat.id]);
+                                    } else {
+                                      setSelectedCategories(selectedCategories.filter(id => id !== cat.id));
+                                    }
+                                  }}
+                                />
+                                <span>{cat.name}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                        <button 
+                          className="t-btn-act" 
+                          style={{ width: '100%', marginTop: '0.5rem' }}
+                          disabled={selectedCategories.length === 0}
+                          onClick={handleAddCategories}
+                        >
+                          Add to Menu
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. TAGS ACCORDION */}
+                  <div className="card glass" style={{ padding: '1rem' }}>
+                    <div 
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontWeight: 'bold' }}
+                      onClick={() => toggleAccordion('tags')}
+                    >
+                      <span>Tags</span>
+                      {accordionState.tags ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </div>
+                    {accordionState.tags && (
+                      <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '0.25rem' }}>
+                          {navTags.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No tags found.</p>
+                          ) : (
+                            navTags.map(tag => (
+                              <label key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedTags.includes(tag.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedTags([...selectedTags, tag.id]);
+                                    } else {
+                                      setSelectedTags(selectedTags.filter(id => id !== tag.id));
+                                    }
+                                  }}
+                                />
+                                <span>{tag.name}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                        <button 
+                          className="t-btn-act" 
+                          style={{ width: '100%', marginTop: '0.5rem' }}
+                          disabled={selectedTags.length === 0}
+                          onClick={handleAddTags}
+                        >
+                          Add to Menu
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 5. CUSTOM LINK ACCORDION */}
+                  <div className="card glass" style={{ padding: '1rem' }}>
+                    <div 
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontWeight: 'bold' }}
+                      onClick={() => toggleAccordion('custom')}
+                    >
+                      <span>Custom Links</span>
+                      {accordionState.custom ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </div>
+                    {accordionState.custom && (
+                      <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>URL</label>
+                          <input 
+                            type="text" 
+                            placeholder="https://..." 
+                            className="search-filter-input"
+                            style={{ width: '100%', boxSizing: 'border-box' }}
+                            value={newCustomUrl}
+                            onChange={(e) => setNewCustomUrl(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>Link Text</label>
+                          <input 
+                            type="text" 
+                            placeholder="Menu Label" 
+                            className="search-filter-input"
+                            style={{ width: '100%', boxSizing: 'border-box' }}
+                            value={newCustomLabel}
+                            onChange={(e) => setNewCustomLabel(e.target.value)}
+                          />
+                        </div>
+                        <button 
+                          className="t-btn-act" 
+                          style={{ width: '100%', marginTop: '0.5rem' }}
+                          disabled={!newCustomUrl || !newCustomLabel}
+                          onClick={handleAddCustomLink}
+                        >
+                          Add to Menu
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* RIGHT COLUMN: MENU STRUCTURE */}
+                <div className="navigation-structure-edit" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div className="card glass" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+                      <label style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>Select a menu to edit:</label>
+                      <select 
+                        className="filter-select" 
+                        style={{ minWidth: '200px' }}
+                        value={navLocation}
+                        onChange={(e) => setNavLocation(e.target.value)}
+                      >
+                        {navLocationsList.map(loc => (
+                          <option key={loc} value={loc}>
+                            {loc.charAt(0).toUpperCase() + loc.slice(1)} Navigation ({loc})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button 
+                      className="t-action-btn"
+                      onClick={() => loadNavigation(navLocation)}
+                      disabled={loadingNav}
+                    >
+                      <RotateCw size={14} className={loadingNav ? 'animate-spin' : ''} style={{ marginRight: '0.25rem' }} /> Refresh
+                    </button>
+                  </div>
+
+                  <div className="card glass" style={{ padding: '1.5rem', minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
+                    <h3 style={{ margin: '0 0 0.5rem 0' }}>Menu Structure</h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0 0 2rem 0' }}>
+                      Arrange the items below in your preferred order. Click Move Up/Down to sort, Indent/Outdent to nest items, and expand items to edit details.
+                    </p>
+
+                    {loadingNav ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '1rem' }}>
+                        <Loader2 className="animate-spin" size={32} />
+                        <p>Loading menu items...</p>
+                      </div>
+                    ) : navItems.length === 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, border: '2px dashed var(--border)', borderRadius: '12px', padding: '3rem 1rem' }}>
+                        <Globe size={32} style={{ color: 'var(--text-muted)', marginBottom: '1rem' }} />
+                        <h4 style={{ margin: '0 0 0.5rem 0' }}>Menu is Empty</h4>
+                        <p style={{ color: 'var(--text-muted)', textAlign: 'center', maxWidth: '300px', fontSize: '0.85rem', margin: 0 }}>
+                          Select pages or items on the left side and click "Add to Menu" to begin customizing.
+                        </p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, marginBottom: '2rem' }}>
+                        {navItems.map((item, idx) => {
+                          const depth = getItemDepth(item, navItems);
+                          const isExpanded = item._expanded === true;
+                          const toggleItemExpand = () => {
+                            const updated = [...navItems];
+                            updated[idx]._expanded = !isExpanded;
+                            setNavItems(updated);
+                          };
+
+                          const updateItemField = (field: string, val: any) => {
+                            const updated = [...navItems];
+                            updated[idx][field] = val;
+                            setNavItems(updated);
+                          };
+
+                          return (
+                            <div key={item.tempId} style={{ paddingLeft: `${depth * 2}rem`, transition: 'all 0.2s' }}>
+                              <div 
+                                className="card glass" 
+                                style={{ 
+                                  padding: '0.75rem 1rem', 
+                                  display: 'flex', 
+                                  flexDirection: 'column', 
+                                  borderLeft: depth > 0 ? '4px solid var(--primary)' : '1px solid var(--border)',
+                                  background: 'var(--bg-elevated)',
+                                  boxShadow: 'none'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                                    <span style={{ cursor: 'move', color: 'var(--text-muted)', userSelect: 'none' }}>☰</span>
+                                    <span style={{ fontWeight: 'bold' }}>{item.label}</span>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                                      {item.url.startsWith('http') || item.url.startsWith('/') === false ? 'Custom Link' : 'Internal'}
+                                    </span>
+                                  </div>
+                                  
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    <button className="t-action-btn" title="Move Up" disabled={idx === 0} onClick={() => moveItemUp(idx)}>▲</button>
+                                    <button className="t-action-btn" title="Move Down" disabled={idx === navItems.length - 1} onClick={() => moveItemDown(idx)}>▼</button>
+                                    <button className="t-action-btn" title="Indent (Nest)" disabled={idx === 0} onClick={() => indentItem(idx)}>▶</button>
+                                    <button className="t-action-btn" title="Outdent" disabled={!item.parentTempId} onClick={() => outdentItem(idx)}>◀</button>
+                                    <button className="t-action-btn" onClick={toggleItemExpand}>{isExpanded ? 'Collapse' : 'Edit'}</button>
+                                    <button className="t-action-btn danger" onClick={() => removeItem(idx)}>Remove</button>
+                                  </div>
+                                </div>
+
+                                {isExpanded && (
+                                  <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div>
+                                      <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Navigation Label</label>
+                                      <input 
+                                        type="text" 
+                                        value={item.label} 
+                                        className="search-filter-input"
+                                        style={{ width: '100%', boxSizing: 'border-box' }}
+                                        onChange={(e) => updateItemField('label', e.target.value)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>URL</label>
+                                      <input 
+                                        type="text" 
+                                        value={item.url} 
+                                        className="search-filter-input"
+                                        style={{ width: '100%', boxSizing: 'border-box' }}
+                                        onChange={(e) => updateItemField('url', e.target.value)}
+                                      />
+                                    </div>
+                                    <div style={{ gridColumn: 'span 2' }}>
+                                      <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Open link in</label>
+                                      <select 
+                                        className="filter-select"
+                                        style={{ width: '100%' }}
+                                        value={item.target}
+                                        onChange={(e) => updateItemField('target', e.target.value)}
+                                      >
+                                        <option value="_self">Same Window / Tab (_self)</option>
+                                        <option value="_blank">New Window / Tab (_blank)</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                      <button 
+                        className="btn-primary-action" 
+                        onClick={saveNavigation}
+                        disabled={savingNav || loadingNav}
+                      >
+                        {savingNav ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : 'Save Menu'}
+                      </button>
                     </div>
 
-                    <div className="theme-card glass">
-                      <div className="theme-card-preview">📚</div>
-                      <div className="theme-card-body">
-                        <h5>Documentation Portal</h5>
-                        <p>Structured sidebar layout suitable for developer docs.</p>
-                        <div className="theme-card-actions">
-                          <button className="t-btn-act">Activate</button>
-                          <button className="t-btn-act sec">Preview</button>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
+
               </div>
             </div>
           )}
@@ -1694,7 +2978,17 @@ export default function App() {
                   <h2>Plugins</h2>
                   <p>Extend site features and functionality using modular plugins.</p>
                 </div>
-                <button className="btn-primary-action"><Plug className="lucide-icon" size={18} /> Install Plugin</button>
+                <input
+                  ref={packageUploadRef}
+                  type="file"
+                  accept=".zip,application/zip"
+                  hidden
+                  onChange={(event) => void handleLocalPackageUpload(event.target.files?.[0] || null)}
+                />
+                <button className="btn-primary-action" disabled={installingPackage} onClick={() => packageUploadRef.current?.click()}>
+                  {installingPackage ? <Loader2 className="animate-spin" size={18} /> : <Plug className="lucide-icon" size={18} />}
+                  {installingPackage ? 'Installing...' : 'Install Plugin'}
+                </button>
               </div>
 
               <div className="card glass no-padding">
@@ -1768,70 +3062,241 @@ export default function App() {
                   <h2>Users</h2>
                   <p>Create and edit access roles for dashboard administrators.</p>
                 </div>
-                <button className="btn-primary-action"><UserPlus className="lucide-icon" size={18} /> Add New User</button>
+                <button 
+                  className="btn-primary-action"
+                  onClick={() => {
+                    setEditingUser(null);
+                    setUserFormUsername('');
+                    setUserFormEmail('');
+                    setUserFormPassword('');
+                    setUserFormRoleId('');
+                    setUserFormStatus('active');
+                    setUsersError(null);
+                    setUsersSuccess(null);
+                    setUserModalOpen(true);
+                  }}
+                >
+                  <UserPlus className="lucide-icon" size={18} /> Add New User
+                </button>
               </div>
+
+              {usersError && (
+                <div className="tax-message error" style={{ marginBottom: '1.5rem' }}>
+                  <AlertCircle size={16} />
+                  <span>{usersError}</span>
+                </div>
+              )}
+
+              {usersSuccess && (
+                <div className="tax-message success" style={{ marginBottom: '1.5rem' }}>
+                  <CheckCircle size={16} />
+                  <span>{usersSuccess}</span>
+                </div>
+              )}
 
               <div className="card glass no-padding">
                 <div className="table-container">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Created At</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td><span className="title-bold">{user.username}</span></td>
-                        <td>{user.email}</td>
-                        <td><span className="user-role-badge admin">Admin</span></td>
-                        <td><span className="status-badge published">Active</span></td>
-                        <td>May 28, 2026</td>
-                        <td className="table-actions">
-                          <button className="t-action-btn">Edit</button>
-                          <button className="t-action-btn" disabled>Suspended</button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td><span className="title-bold">john_editor</span></td>
-                        <td>john.editor@moderncms.local</td>
-                        <td><span className="user-role-badge editor">Editor</span></td>
-                        <td><span className="status-badge published">Active</span></td>
-                        <td>May 27, 2026</td>
-                        <td className="table-actions">
-                          <button className="t-action-btn">Edit</button>
-                          <button className="t-action-btn danger">Suspend</button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td><span className="title-bold">jane_author</span></td>
-                        <td>jane.author@moderncms.local</td>
-                        <td><span className="user-role-badge author">Author</span></td>
-                        <td><span className="status-badge draft">Pending</span></td>
-                        <td>May 26, 2026</td>
-                        <td className="table-actions">
-                          <button className="t-action-btn">Approve</button>
-                          <button className="t-action-btn danger">Delete</button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {loadingUsers ? (
+                    <div style={{ padding: '2rem', textAlign: 'center' }}>
+                      <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+                      <p>Loading users...</p>
+                    </div>
+                  ) : usersList.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center' }}>
+                      <p>No users found.</p>
+                    </div>
+                  ) : (
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Username</th>
+                          <th>Email</th>
+                          <th>Role</th>
+                          <th>Status</th>
+                          <th>Created At</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {usersList.map((u) => {
+                          const isSelf = user ? u.id === user.id : false;
+                          const roleLabel = u.roles && u.roles.length > 0 ? u.roles[0] : 'No Role';
+                          const roleClass = roleLabel.toLowerCase();
+                          
+                          return (
+                            <tr key={u.id}>
+                              <td>
+                                <span className="title-bold">{u.username}</span> {isSelf && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(You)</span>}
+                              </td>
+                              <td>{u.email}</td>
+                              <td>
+                                <span className={`user-role-badge ${roleClass}`}>{roleLabel}</span>
+                              </td>
+                              <td>
+                                <span className={`status-badge ${u.status === 'active' ? 'published' : u.status === 'pending' ? 'draft' : 'error'}`}>
+                                  {u.status}
+                                </span>
+                              </td>
+                              <td>{new Date(u.createdAt).toLocaleDateString()}</td>
+                              <td className="table-actions">
+                                <button 
+                                  className="t-action-btn"
+                                  onClick={() => {
+                                    setEditingUser(u);
+                                    setUserFormUsername(u.username);
+                                    setUserFormEmail(u.email);
+                                    setUserFormPassword('');
+                                    setUserFormRoleId(u.roleIds && u.roleIds.length > 0 ? u.roleIds[0] : '');
+                                    setUserFormStatus(u.status);
+                                    setUsersError(null);
+                                    setUsersSuccess(null);
+                                    setUserModalOpen(true);
+                                  }}
+                                >
+                                  Edit
+                                </button>
+                                <button 
+                                  className="t-action-btn danger" 
+                                  disabled={isSelf}
+                                  onClick={() => handleDeleteUser(u.id)}
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
+
+              {/* Add/Edit User Modal */}
+              {userModalOpen && (
+                <div className="modal-backdrop glass-blur" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="card glass modal-content" style={{ maxWidth: '400px', width: '90%', padding: '2rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                      <h3>{editingUser ? 'Edit User' : 'Add New User'}</h3>
+                      <button className="btn-close" style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => {
+                        setUserModalOpen(false);
+                        setEditingUser(null);
+                      }}>×</button>
+                    </div>
+                    
+                    <form onSubmit={handleSaveUser} className="settings-form" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                      <div className="s-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Username</label>
+                        <input 
+                          type="text" 
+                          value={userFormUsername}
+                          onChange={(e) => setUserFormUsername(e.target.value)}
+                          required
+                          disabled={userFormSubmitting}
+                          placeholder="Username"
+                        />
+                      </div>
+                      <div className="s-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Email</label>
+                        <input 
+                          type="email" 
+                          value={userFormEmail}
+                          onChange={(e) => setUserFormEmail(e.target.value)}
+                          required
+                          disabled={userFormSubmitting}
+                          placeholder="Email address"
+                        />
+                      </div>
+                      <div className="s-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                          Password {editingUser && <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>(Leave blank to keep current)</span>}
+                        </label>
+                        <input 
+                          type="password" 
+                          value={userFormPassword}
+                          onChange={(e) => setUserFormPassword(e.target.value)}
+                          required={!editingUser}
+                          disabled={userFormSubmitting}
+                          placeholder="Password"
+                        />
+                      </div>
+                      <div className="s-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Role</label>
+                        <select 
+                          value={userFormRoleId}
+                          onChange={(e) => setUserFormRoleId(e.target.value === '' ? '' : Number(e.target.value))}
+                          required
+                          disabled={userFormSubmitting}
+                          style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                        >
+                          <option value="">Select a Role</option>
+                          {rolesList.map((role) => (
+                            <option key={role.id} value={role.id}>{role.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="s-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Status</label>
+                        <select 
+                          value={userFormStatus}
+                          onChange={(e) => setUserFormStatus(e.target.value)}
+                          required
+                          disabled={userFormSubmitting}
+                          style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                        >
+                          <option value="active">Active</option>
+                          <option value="suspended">Suspended</option>
+                          <option value="pending">Pending</option>
+                        </select>
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+                        <button 
+                          type="button" 
+                          className="btn-secondary" 
+                          onClick={() => {
+                            setUserModalOpen(false);
+                            setEditingUser(null);
+                          }}
+                          disabled={userFormSubmitting}
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          type="submit" 
+                          className="btn-primary"
+                          disabled={userFormSubmitting}
+                        >
+                          {userFormSubmitting ? 'Saving...' : 'Save User'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* 8. SETTINGS VIEW */}
           {currentRoute === 'settings' && (
             <div className="route-view settings-view">
               <div className="view-header">
                 <h2>Settings</h2>
                 <p>Configure general parameters, reading visibility, and platform security rules.</p>
               </div>
+
+              {settingsError && (
+                <div className="tax-message error" style={{ marginBottom: '1.5rem' }}>
+                  <AlertCircle size={16} />
+                  <span>{settingsError}</span>
+                </div>
+              )}
+
+              {settingsSuccess && (
+                <div className="tax-message success" style={{ marginBottom: '1.5rem' }}>
+                  <CheckCircle size={16} />
+                  <span>{settingsSuccess}</span>
+                </div>
+              )}
 
               <div className="settings-container">
                 {/* Tabs Selector */}
@@ -1922,23 +3387,84 @@ export default function App() {
                     </div>
                   )}
 
-                  {settingsTab === 'reading' && (
+                   {settingsTab === 'reading' && (
                     <div className="tab-pane">
                       <h3>Reading & Visibility Settings</h3>
                       <p className="pane-desc">Control how content is rendered on the public website.</p>
                       <div className="settings-form">
                         <div className="s-group">
                           <label>Homepage displays</label>
-                          <select>
-                            <option>Static Landing Page</option>
-                            <option>Latest Blog Posts</option>
+                          <select
+                            value={homepageMode}
+                            onChange={(e) => setHomepageMode(e.target.value)}
+                          >
+                            <option value="posts">Your latest posts</option>
+                            <option value="single">A static page (select below)</option>
                           </select>
                         </div>
+
+                        {homepageMode === 'single' && (
+                          <div style={{ paddingLeft: '1.5rem', borderLeft: '2px solid var(--border, #dde2ea)', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div className="s-group" style={{ margin: 0 }}>
+                              <label>Homepage</label>
+                              <select
+                                value={homepageTarget}
+                                onChange={(e) => setHomepageTarget(e.target.value)}
+                              >
+                                <option value="">-- Select a Page --</option>
+                                {navPages.map((page) => (
+                                  <option key={page.uuid} value={page.uuid}>
+                                    {page.title} (/{page.slug})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="s-group" style={{ margin: 0 }}>
+                              <label>Posts page</label>
+                              <select
+                                value={postsPageTarget}
+                                onChange={(e) => setPostsPageTarget(e.target.value)}
+                              >
+                                <option value="">-- Select a Page --</option>
+                                {navPages.map((page) => (
+                                  <option key={page.uuid} value={page.uuid}>
+                                    {page.title} (/{page.slug})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="s-group">
-                          <label>Posts per page limit</label>
-                          <input type="number" defaultValue={10} />
+                          <label>Blog pages show at most</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={postsPerPage}
+                            onChange={(e) => setPostsPerPage(parseInt(e.target.value, 10) || 10)}
+                          />
                         </div>
-                        <button className="btn-save-settings">Save Reading Changes</button>
+                        <div className="s-group">
+                          <label>Permalink structure for posts</label>
+                          <select
+                            value={permalinkStructure}
+                            onChange={(e) => setPermalinkStructure(e.target.value)}
+                          >
+                            <option value="/%postname%/">Post name (e.g. http://localhost:5174/sample-post)</option>
+                            <option value="/posts/%postname%/">Posts prefix (e.g. http://localhost:5174/posts/sample-post)</option>
+                            <option value="/article/%postname%/">Article prefix (e.g. http://localhost:5174/article/sample-post)</option>
+                          </select>
+                        </div>
+                        <button
+                          className="btn-save-settings"
+                          disabled={savingSettings}
+                          onClick={handleSaveReadingSettings}
+                        >
+                          {savingSettings ? 'Saving...' : 'Save Reading Changes'}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1998,7 +3524,26 @@ export default function App() {
             </div>
           )}
 
-        </main>
+          {/* 11. WIDGETS VIEW */}
+          {currentRoute === 'widgets' && (
+            <WidgetsPage />
+          )}
+
+          {/* 10. THEME SETTINGS (CUSTOMIZATION) VIEW */}
+          {currentRoute === 'theme-settings' && themeSettingsId && (
+            <ThemeSettingsPage
+              themeId={themeSettingsId}
+              themeName={themesList.find(t => t.id === themeSettingsId)?.name}
+              onBack={() => {
+                setCurrentRoute('themes');
+                setThemeSettingsId(null);
+              }}
+            />
+          )}
+        </>
+      );
+    })()}
+  </main>
       </div>
     </div>
   );

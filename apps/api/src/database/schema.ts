@@ -72,6 +72,7 @@ export const sessions = mysqlTable('sessions', {
 
 export const contents = mysqlTable('contents', {
   id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+  uuid: varchar('uuid', { length: 36 }).notNull().unique(),
   title: varchar('title', { length: 255 }).notNull(),
   slug: varchar('slug', { length: 255 }).notNull(),
   type: varchar('type', { length: 50 }).notNull().default('page'),
@@ -79,6 +80,10 @@ export const contents = mysqlTable('contents', {
   authorId: bigint('author_id', { mode: 'number' }).references(() => users.id),
   excerpt: text('excerpt'),
   body: text('body'),
+  featuredImageUrl: text('featured_image_url'),
+  featuredImageAssetUuid: varchar('featured_image_asset_uuid', { length: 36 }),
+  featuredImageAlt: text('featured_image_alt'),
+  featuredImageSource: varchar('featured_image_source', { length: 50 }),
   publishedAt: datetime('published_at'),
   deletedAt: datetime('deleted_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -106,6 +111,23 @@ export const contentRevisions = mysqlTable('content_revisions', {
 }, (table) => ({
   contentIdRevisionIdx: uniqueIndex('content_id_revision_unique_idx').on(table.contentId, table.revisionNumber),
   contentIdIdx: index('revisions_content_id_idx').on(table.contentId),
+}));
+
+export const contentMetadata = mysqlTable('content_metadata', {
+  id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+  contentUuid: varchar('content_uuid', { length: 36 }).notNull(),
+  ownerPlugin: varchar('owner_plugin', { length: 255 }).notNull(),
+  metaKey: varchar('meta_key', { length: 255 }).notNull(),
+  valueJson: text('value_json').notNull(),
+  valueType: varchar('value_type', { length: 20 }).notNull(),
+  visibility: varchar('visibility', { length: 20 }).notNull().default('private'),
+  revisionPolicy: varchar('revision_policy', { length: 20 }).notNull().default('none'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  ownerKeyUniqueIdx: uniqueIndex('content_metadata_owner_key_unique_idx').on(table.contentUuid, table.ownerPlugin, table.metaKey),
+  contentUuidIdx: index('content_metadata_content_uuid_idx').on(table.contentUuid),
+  ownerPluginIdx: index('content_metadata_owner_plugin_idx').on(table.ownerPlugin),
 }));
 
 export const categories = mysqlTable('categories', {
@@ -219,4 +241,54 @@ export const pluginMigrations = mysqlTable('plugin_migrations', {
 }, (table) => ({
   pluginMigrationUniqueIdx: uniqueIndex('plugin_migration_unique_idx').on(table.pluginKey, table.migration),
   pluginKeyIdx: index('plugin_migrations_plugin_key_idx').on(table.pluginKey),
+}));
+
+export const packageVersions = mysqlTable('package_versions', {
+  id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+  packageId: varchar('package_id', { length: 255 }).notNull(),
+  packageType: varchar('package_type', { length: 50 }).notNull(),
+  version: varchar('version', { length: 50 }).notNull(),
+  publisherId: varchar('publisher_id', { length: 255 }),
+  source: varchar('source', { length: 50 }).notNull(),
+  archiveChecksum: varchar('archive_checksum', { length: 64 }).notNull(),
+  signatureStatus: varchar('signature_status', { length: 30 }).notNull(),
+  installPath: varchar('install_path', { length: 1024 }).notNull(),
+  manifestJson: text('manifest_json').notNull(),
+  installedAt: timestamp('installed_at').defaultNow().notNull(),
+}, (table) => ({
+  packageVersionUniqueIdx: uniqueIndex('package_version_unique_idx').on(table.packageId, table.version),
+  packageIdIdx: index('package_versions_package_id_idx').on(table.packageId),
+}));
+
+export const packageOperations = mysqlTable('package_operations', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  packageId: varchar('package_id', { length: 255 }),
+  operation: varchar('operation', { length: 30 }).notNull(),
+  source: varchar('source', { length: 50 }).notNull(),
+  fromVersion: varchar('from_version', { length: 50 }),
+  toVersion: varchar('to_version', { length: 50 }),
+  status: varchar('status', { length: 30 }).notNull(),
+  actorUserId: bigint('actor_user_id', { mode: 'number' }),
+  detailsJson: text('details_json'),
+  error: text('error'),
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+  completedAt: datetime('completed_at'),
+}, (table) => ({
+  packageOperationPackageIdx: index('package_operations_package_id_idx').on(table.packageId),
+  packageOperationStatusIdx: index('package_operations_status_idx').on(table.status),
+}));
+
+export const widgets = mysqlTable('widgets', {
+  id: bigint('id', { mode: 'number' }).primaryKey().autoincrement(),
+  themeId: varchar('theme_id', { length: 255 }).notNull(),
+  region: varchar('region', { length: 100 }).notNull(),
+  type: varchar('type', { length: 100 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  settingsJson: text('settings_json'),
+  sortOrder: int('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  themeRegionIdx: index('widgets_theme_region_idx').on(table.themeId, table.region),
+  sortOrderIdx: index('widgets_sort_order_idx').on(table.sortOrder),
 }));

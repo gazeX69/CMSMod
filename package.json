@@ -7,7 +7,8 @@
     "dev:admin": "pnpm --filter @modern-cms/admin dev",
     "dev:public": "pnpm --filter @modern-cms/public dev",
     "start:dev": "node scripts/dev-launcher.js",
-    "build": "pnpm -r build"
+    "build": "pnpm architecture:check && pnpm -r build",
+    "architecture:check": "node scripts/architecture-check.js"
   },
   "devDependencies": {
     "playwright": "^1.60.0",

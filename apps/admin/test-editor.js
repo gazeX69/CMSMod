@@ -10,7 +10,7 @@ const mediaNodeView = read('src/editor/nodes/MediaNodeView.tsx');
 const externalImageNode = read('src/editor/nodes/ExternalImageNode.ts');
 const imageNodeSelection = read('src/editor/nodes/imageNodeSelection.ts');
 const editorProvider = read('src/editor/provider/EditorProvider.tsx');
-const articleManager = read('src/pages/ArticleManager.tsx');
+const articleManager = read('src/pages/ContentManager.tsx');
 
 const checks = [
   [

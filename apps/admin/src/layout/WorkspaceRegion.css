@@ -14,3 +14,14 @@
   margin: 0 auto;
   width: 100%;
 }
+
+@media (max-width: 900px) {
+  .admin-content-viewport {
+    overscroll-behavior: contain;
+  }
+
+  .route-view {
+    max-width: 100%;
+    min-width: 0;
+  }
+}

@@ -12,7 +12,7 @@ const imageNodeSelection = read('src/editor/nodes/imageNodeSelection.ts');
 const editorCanvasCss = read('src/editor/layout/EditorCanvas.css');
 const editorProvider = read('src/editor/provider/EditorProvider.tsx');
 const propertyPanelHost = read('src/editor/property-panels/PropertyPanelHost.tsx');
-const articleManager = read('src/pages/ArticleManager.tsx');
+const articleManager = read('src/pages/ContentManager.tsx');
 
 function assert(condition, message) {
   if (!condition) {
@@ -213,7 +213,7 @@ function testPluginActivationFiltering() {
 
   assert(
     articleManager.includes('!source.pluginId || activePluginIds.has(source.pluginId)'),
-    'ArticleManager must filter plugin insert sources through generic plugin metadata.'
+    'ContentManager must filter plugin insert sources through generic plugin metadata.'
   );
   assert(
     filterSources([{ key: 'plugin-image', status: 'active' }]).some((source) => source.id === 'plugin-image-source'),

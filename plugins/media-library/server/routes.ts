@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { eq, and, isNull, isNotNull, like, desc, asc, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, isNotNull, like, desc, asc, sql } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -142,7 +142,44 @@ const MEDIA_MIME_GROUPS: Record<string, string[]> = {
   ],
 };
 
-const DEFAULT_MEDIA_ALLOWED_GROUPS = 'images,documents';
+const DEFAULT_MEDIA_ALLOWED_GROUPS = 'images,documents,audio,video';
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function readMediaAttributes(source: string) {
+  const attrs: Record<string, string> = {};
+  source.replace(/([\w-]+)=["']([^"']*)["']/g, (_match, key, value) => {
+    attrs[key] = value;
+    return _match;
+  });
+  return attrs;
+}
+
+export function renderPublicMediaBlock(attributeSource: string) {
+  const attrs = readMediaAttributes(attributeSource);
+  const uuid = attrs['data-media-uuid'];
+  if (!uuid) return '<!-- Invalid media block -->';
+  const mime = attrs['data-mime-type'] || 'application/octet-stream';
+  const label = escapeHtml(attrs['data-title'] || attrs['data-original-name'] || attrs['data-filename'] || 'Media file');
+  const caption = attrs['data-caption'] ? `<figcaption>${escapeHtml(attrs['data-caption'])}</figcaption>` : '';
+  const display = attrs['data-display'] || 'embed';
+  const apiBase = (process.env.VITE_API_URL || 'http://127.0.0.1:4000').replace(/\/+$/, '');
+  const src = `${apiBase}/api/media/resolve/${encodeURIComponent(uuid)}`;
+  const download = `${src}?download=1`;
+
+  if (mime.startsWith('image/')) return `<figure class="cms-media cms-media--image"><img src="${src}" alt="${label}" loading="lazy">${caption}</figure>`;
+  if (mime.startsWith('video/')) return `<figure class="cms-media cms-media--video"><video controls preload="metadata" poster="${src}?size=thumb"><source src="${src}" type="${escapeHtml(mime)}"></video>${caption}</figure>`;
+  if (mime.startsWith('audio/')) return `<figure class="cms-media cms-media--audio"><strong>${label}</strong><audio controls preload="metadata"><source src="${src}" type="${escapeHtml(mime)}"></audio>${caption}</figure>`;
+  if (mime === 'application/pdf' && display === 'embed') return `<figure class="cms-media cms-media--pdf"><object data="${src}" type="application/pdf" style="width:100%;height:min(75vh,760px)"><a href="${download}">Download ${label}</a></object>${caption}</figure>`;
+  return `<div class="cms-media cms-media--document"><a href="${download}" download>${label}</a>${caption}</div>`;
+}
 
 function normalizeMimeList(value: string) {
   return value
@@ -180,12 +217,40 @@ function resolveAllowedMimes(groupsValue: string, customMimesValue: string, allo
 
 export default async function mediaRoutes(
   app: FastifyInstance,
-  options: { db: any; schema: any; requireAuth: any; sdk?: any }
+  options: { sdk: any }
 ) {
-  const { db, requireAuth } = options;
+  const { sdk } = options;
+  const db = sdk.database.orm;
+  const requireAuth = sdk.auth.requireUser;
+  app.addHook('onRequest', (request, reply) => sdk.requireActive(request, reply));
+
+  sdk.capabilities.registerProvider('media', {
+    getByUuid: async (uuid: string) => {
+      const rows = await db.select().from(mediaFiles).where(and(eq(mediaFiles.uuid, uuid), isNull(mediaFiles.deletedAt))).limit(1);
+      if (!rows[0]) return null;
+      const item = rows[0];
+      return { uuid: item.uuid, filename: item.filename, originalName: item.originalName, mimeType: item.mimeType, size: item.size, altText: item.altText, caption: item.caption, publicUrl: `/api/media/resolve/${item.uuid}` };
+    },
+    resolve: async (uuid: string, resolveOptions: Record<string, string> = {}) => `/api/media/resolve/${uuid}${resolveOptions.size ? `?size=${encodeURIComponent(resolveOptions.size)}` : ''}`,
+    search: async (query: any = {}) => {
+      const page = Math.max(1, Number(query.page) || 1);
+      const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+      const filters: any[] = [isNull(mediaFiles.deletedAt)];
+      if (query.mimeType) filters.push(eq(mediaFiles.mimeType, query.mimeType));
+      if (query.query) filters.push(or(like(mediaFiles.filename, `%${query.query}%`), like(mediaFiles.originalName, `%${query.query}%`), like(mediaFiles.altText, `%${query.query}%`)));
+      const rows = await db.select().from(mediaFiles).where(and(...filters)).orderBy(desc(mediaFiles.createdAt)).limit(limit).offset((page - 1) * limit);
+      const totals = await db.select({ value: sql<number>`count(*)` }).from(mediaFiles).where(and(...filters));
+      const total = Number(totals[0]?.value || 0);
+      return { items: rows.map((item: any) => ({ uuid: item.uuid, filename: item.filename, originalName: item.originalName, mimeType: item.mimeType, size: item.size, altText: item.altText, caption: item.caption, publicUrl: `/api/media/resolve/${item.uuid}` })), page, limit, total, totalPages: Math.ceil(total / limit) };
+    },
+  }, { version: '1.0.0', mode: 'exclusive' });
+
+  sdk.publicContent.registerContentFilter('render-media-blocks', async (html: string) => {
+    return html.replace(/<cms-media\b([^>]*)>(?:<\/cms-media>)?/gi, (_match, attributes) => renderPublicMediaBlock(attributes));
+  }, 50);
 
   async function requireActiveMediaLibrary(request: FastifyRequest, reply: FastifyReply) {
-    return options.sdk?.requireActive(request, reply);
+    return sdk.requireActive(request, reply);
   }
 
   function requireMediaPermission(permissionKey: string) {
@@ -196,24 +261,24 @@ export default async function mediaRoutes(
         return;
       }
 
-      const allowed = await options.sdk?.permissions?.can(userId, permissionKey);
+      const allowed = await sdk.permissions.can(userId, permissionKey);
       if (!allowed) {
         reply.status(403).send({ error: 'Forbidden', permission: permissionKey });
       }
     };
   }
 
-  // GET /admin/media/settings - Fetch settings
+  // GET /admin/settings - Fetch settings
   app.get(
-    '/admin/media/settings',
+    '/admin/settings',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.read')] },
     async (request, reply) => {
       try {
-        const maxSize = await options.sdk.settings.getWithFallback('media.max_upload_size_mb', '10', ['media_max_upload_size_mb']);
-        const allowedGroups = await options.sdk.settings.getWithFallback('media.allowed_groups', DEFAULT_MEDIA_ALLOWED_GROUPS, ['media_allowed_groups']);
-        const customMimes = await options.sdk.settings.getWithFallback('media.custom_mime_types', '', ['media_custom_mime_types']);
-        const organizeByDate = await options.sdk.settings.getWithFallback('media.organize_by_date', 'true', ['media_organize_by_date']);
-        const allowSvg = await options.sdk.settings.getWithFallback('media.allow_svg_upload', 'false', ['media_allow_svg_upload']);
+        const maxSize = await sdk.settings.getWithFallback('media.max_upload_size_mb', '10', ['media_max_upload_size_mb']);
+        const allowedGroups = await sdk.settings.getWithFallback('media.allowed_groups', DEFAULT_MEDIA_ALLOWED_GROUPS, ['media_allowed_groups']);
+        const customMimes = await sdk.settings.getWithFallback('media.custom_mime_types', '', ['media_custom_mime_types']);
+        const organizeByDate = await sdk.settings.getWithFallback('media.organize_by_date', 'true', ['media_organize_by_date']);
+        const allowSvg = await sdk.settings.getWithFallback('media.allow_svg_upload', 'false', ['media_allow_svg_upload']);
 
         return {
           max_upload_size_mb: parseInt(maxSize, 10),
@@ -234,7 +299,7 @@ export default async function mediaRoutes(
 
   // PUT /admin/media/settings - Update settings
   app.put(
-    '/admin/media/settings',
+    '/admin/settings',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.update')] },
     async (request, reply) => {
 
@@ -271,11 +336,11 @@ export default async function mediaRoutes(
       }
 
       try {
-        await options.sdk.settings.set('media.max_upload_size_mb', String(sizeNum), { group: 'media', type: 'number', isPublic: true });
-        await options.sdk.settings.set('media.allowed_groups', validGroups.join(','), { group: 'media', type: 'string', isPublic: true });
-        await options.sdk.settings.set('media.custom_mime_types', custom_mime_types.toString(), { group: 'media', type: 'string', isPublic: false });
-        await options.sdk.settings.set('media.organize_by_date', organize_by_date ? 'true' : 'false', { group: 'media', type: 'boolean', isPublic: false });
-        await options.sdk.settings.set('media.allow_svg_upload', allow_svg_upload ? 'true' : 'false', { group: 'media', type: 'boolean', isPublic: false });
+        await sdk.settings.set('media.max_upload_size_mb', String(sizeNum), { group: 'media', type: 'number', isPublic: true });
+        await sdk.settings.set('media.allowed_groups', validGroups.join(','), { group: 'media', type: 'string', isPublic: true });
+        await sdk.settings.set('media.custom_mime_types', custom_mime_types.toString(), { group: 'media', type: 'string', isPublic: false });
+        await sdk.settings.set('media.organize_by_date', organize_by_date ? 'true' : 'false', { group: 'media', type: 'boolean', isPublic: false });
+        await sdk.settings.set('media.allow_svg_upload', allow_svg_upload ? 'true' : 'false', { group: 'media', type: 'boolean', isPublic: false });
 
         return { ok: true };
       }
@@ -290,7 +355,7 @@ export default async function mediaRoutes(
 
   // GET /admin/media - Retrieve media files list
   app.get(
-    '/admin/media',
+    '/admin',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.read')] },
     async (request, reply) => {
       const { page = '1', limit = '50', search = '', mimeType = '', sort = 'createdAt_DESC' } = request.query as any;
@@ -383,7 +448,7 @@ export default async function mediaRoutes(
 
   // GET /admin/media/trash - Retrieve soft-deleted media files
   app.get(
-    '/admin/media/trash',
+    '/admin/trash',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.read')] },
     async (request, reply) => {
       try {
@@ -417,7 +482,7 @@ export default async function mediaRoutes(
 
   // PUT /admin/media/restore/:id - Restore media file from trash
   app.put(
-    '/admin/media/restore/:id',
+    '/admin/restore/:id',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.delete')] },
     async (request, reply) => {
       const { id } = request.params as any;
@@ -430,7 +495,7 @@ export default async function mediaRoutes(
           .update(mediaFiles)
           .set({ deletedAt: null, updatedAt: new Date() })
           .where(eq(mediaFiles.id, fileId));
-        await options.sdk?.events?.emit('media.restored', { id: fileId });
+        await sdk.events.emit('media.restored', { id: fileId });
 
         return { ok: true };
       } catch (err) {
@@ -443,7 +508,7 @@ export default async function mediaRoutes(
 
   // DELETE /admin/media/force/:id - Permanently delete file (DB & Hardisk)
   app.delete(
-    '/admin/media/force/:id',
+    '/admin/force/:id',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.delete')] },
     async (request, reply) => {
       const { id } = request.params as any;
@@ -489,7 +554,7 @@ export default async function mediaRoutes(
 
         // 4. Hapus datanya secara permanen dari database
         await db.delete(mediaFiles).where(eq(mediaFiles.id, fileId));
-        await options.sdk?.events?.emit('media.deleted', {
+        await sdk.events.emit('media.deleted', {
           id: fileId,
           permanent: true,
         });
@@ -504,10 +569,10 @@ export default async function mediaRoutes(
   );
 
   // ==========================================
-  // GET /admin/media/:id - Fetch details
+  // GET /admin/:id - Fetch details
   // ==========================================
   app.get(
-    '/admin/media/:id',
+    '/admin/:id',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.read')] },
     async (request, reply) => {
       const { id } = request.params as any;
@@ -552,7 +617,7 @@ export default async function mediaRoutes(
 
   // POST /admin/media/upload - Safe multipart upload
   app.post(
-    '/admin/media/upload',
+    '/admin/upload',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.create')] },
     async (request, reply) => {
       if (!(request as any).isMultipart()) {
@@ -568,13 +633,13 @@ export default async function mediaRoutes(
         }
 
         // Fetch current settings
-        const maxSizeMbStr = await options.sdk.settings.getWithFallback('media.max_upload_size_mb', '10', ['media_max_upload_size_mb']);
+        const maxSizeMbStr = await sdk.settings.getWithFallback('media.max_upload_size_mb', '10', ['media_max_upload_size_mb']);
         
-        const allowedGroupsStr = await options.sdk.settings.getWithFallback('media.allowed_groups', DEFAULT_MEDIA_ALLOWED_GROUPS, ['media_allowed_groups']);
-        const customMimesStr = await options.sdk.settings.getWithFallback('media.custom_mime_types', '', ['media_custom_mime_types']);
+        const allowedGroupsStr = await sdk.settings.getWithFallback('media.allowed_groups', DEFAULT_MEDIA_ALLOWED_GROUPS, ['media_allowed_groups']);
+        const customMimesStr = await sdk.settings.getWithFallback('media.custom_mime_types', '', ['media_custom_mime_types']);
         
-        const organizeByDateStr = await options.sdk.settings.getWithFallback('media.organize_by_date', 'true', ['media_organize_by_date']);
-        const allowSvgStr = await options.sdk.settings.getWithFallback('media.allow_svg_upload', 'false', ['media_allow_svg_upload']);
+        const organizeByDateStr = await sdk.settings.getWithFallback('media.organize_by_date', 'true', ['media_organize_by_date']);
+        const allowSvgStr = await sdk.settings.getWithFallback('media.allow_svg_upload', 'false', ['media_allow_svg_upload']);
 
         const maxSizeBytes = parseInt(maxSizeMbStr, 10) * 1024 * 1024;
         const organizeByDate = organizeByDateStr === 'true';
@@ -753,7 +818,7 @@ export default async function mediaRoutes(
         });
 
         const insertedId = (result as any).insertId;
-        await options.sdk?.events?.emit('media.uploaded', {
+        await sdk.events.emit('media.uploaded', {
           id: insertedId,
           uuid: assetUuid,
           mimeType: mime,
@@ -784,7 +849,7 @@ export default async function mediaRoutes(
 
   // PUT /admin/media/:id - Update media metadata
   app.put(
-    '/admin/media/:id',
+    '/admin/:id',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.update')] },
     async (request, reply) => {
       const { id } = request.params as any;
@@ -842,7 +907,7 @@ export default async function mediaRoutes(
 
   // DELETE /admin/media/:id - Soft delete media file
   app.delete(
-    '/admin/media/:id',
+    '/admin/:id',
     { preHandler: [requireAuth, requireActiveMediaLibrary, requireMediaPermission('media.delete')] },
     async (request, reply) => {
       const { id } = request.params as any;
@@ -864,7 +929,7 @@ export default async function mediaRoutes(
           .update(mediaFiles)
           .set({ deletedAt: new Date(), updatedAt: new Date() })
           .where(eq(mediaFiles.id, fileId));
-        await options.sdk?.events?.emit('media.deleted', {
+        await sdk.events.emit('media.deleted', {
           id: fileId,
           permanent: false,
         });
@@ -883,10 +948,11 @@ export default async function mediaRoutes(
   // Supports ?size=thumb query to serve thumbnail when available
   // GET /media/resolve/:uuid - Public Media Asset Resolver
   app.get(
-    '/media/resolve/:uuid',
+    '/resolve/:uuid',
+    { preHandler: [requireActiveMediaLibrary] },
     async (request, reply) => {
       const { uuid } = request.params as any;
-      const { size } = request.query as any; // Tangkap query ?size=thumb
+      const { size, download } = request.query as any;
 
       try {
         // PERBAIKAN: Hapus isNull(deletedAt) agar Trash View di Admin bisa merender gambar.
@@ -933,7 +999,32 @@ export default async function mediaRoutes(
           return { error: 'Physical file missing from storage' };
         }
 
+        const stat = fs.statSync(targetFilePath);
+        const rangeHeader = request.headers.range;
+        const safeFilename = String(media.originalName || media.filename || 'download').replace(/["\r\n]/g, '_');
+        reply.header('Accept-Ranges', 'bytes');
+        reply.header('Content-Disposition', `${download === '1' ? 'attachment' : 'inline'}; filename="${safeFilename}"`);
         reply.type(mimeToServe);
+
+        if (rangeHeader) {
+          const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
+          if (!match) {
+            reply.status(416).header('Content-Range', `bytes */${stat.size}`);
+            return reply.send();
+          }
+          const start = match[1] ? Number(match[1]) : 0;
+          const end = match[2] ? Number(match[2]) : stat.size - 1;
+          if (start > end || start >= stat.size || end >= stat.size) {
+            reply.status(416).header('Content-Range', `bytes */${stat.size}`);
+            return reply.send();
+          }
+          reply.status(206);
+          reply.header('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+          reply.header('Content-Length', String(end - start + 1));
+          return reply.send(fs.createReadStream(targetFilePath, { start, end }));
+        }
+
+        reply.header('Content-Length', String(stat.size));
         const stream = fs.createReadStream(targetFilePath);
         return reply.send(stream);
 

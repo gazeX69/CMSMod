@@ -5,6 +5,19 @@ import { eq, and, isNull, ne } from 'drizzle-orm';
 import { requirePermission } from '../hooks/permissions.js';
 import { createRevisionSnapshot } from '../utils/revisions.js';
 import { pluginEventBus } from '../plugins/pluginEventBus.js';
+import crypto from 'crypto';
+
+const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+const isNumeric = (val: string) => /^\d+$/.test(val);
+
+function getPostCondition(identifier: string) {
+  if (isUuid(identifier)) {
+    return eq(contents.uuid, identifier);
+  } else if (isNumeric(identifier)) {
+    return eq(contents.id, parseInt(identifier, 10));
+  }
+  return null;
+}
 
 export async function postsRoutes(app: FastifyInstance) {
   const requireContentRead = requirePermission('content.read');
@@ -24,7 +37,11 @@ export async function postsRoutes(app: FastifyInstance) {
     try {
       let queryCondition = and(eq(contents.type, 'article'), eq(contents.slug, slug), isNull(contents.deletedAt));
       if (excludeId) {
-        queryCondition = and(queryCondition, ne(contents.id, parseInt(excludeId, 10)));
+        if (isUuid(excludeId)) {
+          queryCondition = and(queryCondition, ne(contents.uuid, excludeId));
+        } else if (isNumeric(excludeId)) {
+          queryCondition = and(queryCondition, ne(contents.id, parseInt(excludeId, 10)));
+        }
       }
 
       const existing = await db.select().from(contents).where(queryCondition).limit(1);
@@ -39,7 +56,11 @@ export async function postsRoutes(app: FastifyInstance) {
       while (true) {
         let suggestCondition = and(eq(contents.type, 'article'), eq(contents.slug, suggestedSlug), isNull(contents.deletedAt));
         if (excludeId) {
-          suggestCondition = and(suggestCondition, ne(contents.id, parseInt(excludeId, 10)));
+          if (isUuid(excludeId)) {
+            suggestCondition = and(suggestCondition, ne(contents.uuid, excludeId));
+          } else if (isNumeric(excludeId)) {
+            suggestCondition = and(suggestCondition, ne(contents.id, parseInt(excludeId, 10)));
+          }
         }
         const check = await db.select().from(contents).where(suggestCondition).limit(1);
         if (check.length === 0) {
@@ -100,11 +121,17 @@ export async function postsRoutes(app: FastifyInstance) {
   // GET /api/posts/:id
   app.get('/posts/:id', { preHandler: requireContentRead }, async (request, reply) => {
     const { id } = request.params as any;
+    const lookupCondition = getPostCondition(id);
+    if (!lookupCondition) {
+      reply.status(400);
+      return { error: 'Invalid identifier format. Must be a numeric ID or a valid UUID.' };
+    }
+
     try {
       const post = await db
         .select()
         .from(contents)
-        .where(and(eq(contents.id, parseInt(id, 10)), eq(contents.type, 'article'), isNull(contents.deletedAt)))
+        .where(and(lookupCondition, eq(contents.type, 'article'), isNull(contents.deletedAt)))
         .limit(1);
 
       if (post.length === 0) {
@@ -166,8 +193,10 @@ export async function postsRoutes(app: FastifyInstance) {
       const userId = request.user!.id;
       const status = body.status || 'draft';
       const publishedAt = status === 'published' ? new Date() : null;
+      const newUuid = crypto.randomUUID();
 
       const [result] = await db.insert(contents).values({
+        uuid: newUuid,
         title: body.title,
         slug: body.slug,
         type: 'article',
@@ -175,6 +204,10 @@ export async function postsRoutes(app: FastifyInstance) {
         authorId: userId,
         excerpt: body.excerpt || null,
         body: body.body || null,
+        featuredImageUrl: body.featuredImage?.url || null,
+        featuredImageAssetUuid: body.featuredImage?.assetUuid || null,
+        featuredImageAlt: body.featuredImage?.alt || null,
+        featuredImageSource: body.featuredImage?.source || null,
         publishedAt,
       });
 
@@ -202,15 +235,21 @@ export async function postsRoutes(app: FastifyInstance) {
       await createRevisionSnapshot(contentId, userId);
       await pluginEventBus.emit('content.created', {
         contentId,
-        type: 'article',
-        status,
+        contentUuid: newUuid,
+        contentType: 'article',
+        previousSlug: null,
+        currentSlug: body.slug,
+        previousStatus: null,
+        currentStatus: status,
+        changedFields: ['title', 'slug', 'status', 'excerpt', 'body', 'featuredImage'],
         authorId: userId,
-      }, 'content-engine');
+      }, 'content-engine', 2);
 
       return {
         ok: true,
         article: {
           id: contentId,
+          uuid: newUuid,
           type: 'article',
           title: body.title,
           slug: body.slug,
@@ -227,6 +266,11 @@ export async function postsRoutes(app: FastifyInstance) {
   // PUT /api/posts/:id (Protected)
   app.put('/posts/:id', { preHandler: requireContentUpdate }, async (request, reply) => {
     const { id } = request.params as any;
+    const lookupCondition = getPostCondition(id);
+    if (!lookupCondition) {
+      reply.status(400);
+      return { error: 'Invalid identifier format. Must be a numeric ID or a valid UUID.' };
+    }
     const body = request.body as any;
 
     if (!body || !body.title || !body.slug) {
@@ -235,17 +279,18 @@ export async function postsRoutes(app: FastifyInstance) {
     }
 
     try {
-      const postId = parseInt(id, 10);
       const existingPost = await db
         .select()
         .from(contents)
-        .where(and(eq(contents.id, postId), eq(contents.type, 'article'), isNull(contents.deletedAt)))
+        .where(and(lookupCondition, eq(contents.type, 'article'), isNull(contents.deletedAt)))
         .limit(1);
 
       if (existingPost.length === 0) {
         reply.status(404);
         return { error: 'Article not found' };
       }
+
+      const postId = existingPost[0].id;
 
       // Check slug collision
       const collision = await db
@@ -276,6 +321,10 @@ export async function postsRoutes(app: FastifyInstance) {
           status: newStatus,
           excerpt: body.excerpt || null,
           body: body.body || null,
+          featuredImageUrl: body.featuredImage?.url || null,
+          featuredImageAssetUuid: body.featuredImage?.assetUuid || null,
+          featuredImageAlt: body.featuredImage?.alt || null,
+          featuredImageSource: body.featuredImage?.source || null,
           publishedAt,
           updatedAt: new Date(),
         })
@@ -305,10 +354,28 @@ export async function postsRoutes(app: FastifyInstance) {
       await createRevisionSnapshot(postId, userId);
       await pluginEventBus.emit('content.updated', {
         contentId: postId,
-        type: 'article',
-        status: newStatus,
+        contentUuid: existingPost[0].uuid,
+        contentType: 'article',
+        previousSlug: existingPost[0].slug,
+        currentSlug: body.slug,
+        previousStatus: oldStatus,
+        currentStatus: newStatus,
+        changedFields: ['title', 'slug', 'status', 'excerpt', 'body', 'featuredImage'],
         authorId: userId,
-      }, 'content-engine');
+      }, 'content-engine', 2);
+      if (newStatus === 'published' && oldStatus !== 'published') {
+        await pluginEventBus.emit('content.published', {
+          contentId: postId,
+          contentUuid: existingPost[0].uuid,
+          contentType: 'article',
+          previousSlug: existingPost[0].slug,
+          currentSlug: body.slug,
+          previousStatus: oldStatus,
+          currentStatus: newStatus,
+          changedFields: ['status', 'publishedAt'],
+          authorId: userId,
+        }, 'content-engine', 2);
+      }
 
       return { ok: true };
     } catch (error) {
@@ -321,18 +388,24 @@ export async function postsRoutes(app: FastifyInstance) {
   // POST /api/posts/:id/publish (Protected)
   app.post('/posts/:id/publish', { preHandler: requireContentPublish }, async (request, reply) => {
     const { id } = request.params as any;
+    const lookupCondition = getPostCondition(id);
+    if (!lookupCondition) {
+      reply.status(400);
+      return { error: 'Invalid identifier format. Must be a numeric ID or a valid UUID.' };
+    }
     try {
-      const postId = parseInt(id, 10);
       const existing = await db
         .select()
         .from(contents)
-        .where(and(eq(contents.id, postId), eq(contents.type, 'article'), isNull(contents.deletedAt)))
+        .where(and(lookupCondition, eq(contents.type, 'article'), isNull(contents.deletedAt)))
         .limit(1);
 
       if (existing.length === 0) {
         reply.status(404);
         return { error: 'Article not found' };
       }
+
+      const postId = existing[0].id;
 
       const post = existing[0];
       if (!post.title || !post.slug || !post.body) {
@@ -356,9 +429,15 @@ export async function postsRoutes(app: FastifyInstance) {
       await createRevisionSnapshot(postId, userId);
       await pluginEventBus.emit('content.published', {
         contentId: postId,
-        type: 'article',
+        contentUuid: post.uuid,
+        contentType: 'article',
+        previousSlug: post.slug,
+        currentSlug: post.slug,
+        previousStatus: post.status,
+        currentStatus: 'published',
+        changedFields: ['status', 'publishedAt'],
         authorId: userId,
-      }, 'content-engine');
+      }, 'content-engine', 2);
 
       return { ok: true };
     } catch (error) {
@@ -371,12 +450,16 @@ export async function postsRoutes(app: FastifyInstance) {
   // DELETE /api/posts/:id (Protected)
   app.delete('/posts/:id', { preHandler: requireContentDelete }, async (request, reply) => {
     const { id } = request.params as any;
+    const lookupCondition = getPostCondition(id);
+    if (!lookupCondition) {
+      reply.status(400);
+      return { error: 'Invalid identifier format. Must be a numeric ID or a valid UUID.' };
+    }
     try {
-      const postId = parseInt(id, 10);
       const existing = await db
         .select()
         .from(contents)
-        .where(and(eq(contents.id, postId), eq(contents.type, 'article'), isNull(contents.deletedAt)))
+        .where(and(lookupCondition, eq(contents.type, 'article'), isNull(contents.deletedAt)))
         .limit(1);
 
       if (existing.length === 0) {
@@ -384,12 +467,20 @@ export async function postsRoutes(app: FastifyInstance) {
         return { error: 'Article not found' };
       }
 
+      const postId = existing[0].id;
+
       await db.update(contents).set({ deletedAt: new Date() }).where(eq(contents.id, postId));
       await pluginEventBus.emit('content.deleted', {
         contentId: postId,
-        type: 'article',
+        contentUuid: existing[0].uuid,
+        contentType: 'article',
+        previousSlug: existing[0].slug,
+        currentSlug: existing[0].slug,
+        previousStatus: existing[0].status,
+        currentStatus: 'deleted',
+        changedFields: ['deletedAt'],
         authorId: request.user!.id,
-      }, 'content-engine');
+      }, 'content-engine', 2);
       return { ok: true };
     } catch (error) {
       app.log.error(error, 'Error deleting post');

@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, FileText, Heading, History, LayoutList, ListTree, MousePointerSquareDashed, Pilcrow, Quote, type LucideIcon } from 'lucide-react';
 import { useEditorContext } from '../core/EditorContext';
 import { PropertyPanelHost } from '../property-panels';
-import type { EditorInspectorMode, EditorInspectorSectionDefinition } from '../contracts';
+import type { EditorInspectorSectionDefinition } from '../contracts';
 
 const SECTION_ICONS: Record<string, LucideIcon> = {
   document: FileText,
@@ -11,7 +11,15 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
   outline: ListTree,
 };
 
-type InspectorTab = 'document' | 'outline' | 'blocks' | 'history';
+type InspectorTab = 'document' | 'inspector' | 'outline' | 'blocks' | 'history';
+
+const INSPECTOR_TABS: Array<{ id: InspectorTab; label: string }> = [
+  { id: 'document', label: 'Document' },
+  { id: 'inspector', label: 'Inspector' },
+  { id: 'outline', label: 'Outline' },
+  { id: 'blocks', label: 'Blocks' },
+  { id: 'history', label: 'History' },
+];
 
 interface InspectorHostProps {
   documentContent?: ReactNode;
@@ -23,64 +31,75 @@ export function InspectorHost({ documentContent, historyContent }: InspectorHost
   const selectedNode = selectionState.selectedNode;
   const selectedBlockNode = selectionState.selectedBlockNode;
   const selectedBlockPos = selectionState.selectedBlockPos;
-  const mode: EditorInspectorMode = selectedNode || selectedBlockNode ? 'block' : 'document';
   const [activeTab, setActiveTab] = useState<InspectorTab>('document');
+  const selectedBlockKey = selectedNode
+    ? `node:${selectedNode.type?.name || 'block'}:${editor?.state.selection.from ?? 0}`
+    : selectedBlockNode
+      ? `block:${selectedBlockNode.type?.name || 'block'}:${selectedBlockPos ?? 0}`
+      : null;
+  const previousSelectedBlockKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (selectedBlockKey && selectedBlockKey !== previousSelectedBlockKey.current) {
+      setActiveTab('inspector');
+    }
+    previousSelectedBlockKey.current = selectedBlockKey;
+  }, [selectedBlockKey]);
 
   if (!editor) return null;
 
   const blockStats = getBlockStatistics(editor.getJSON());
 
-  if (mode === 'block') {
-    const blockNode = selectedNode || selectedBlockNode;
-    return (
-      <aside className="editor-inspector-shell" data-inspector-mode="block">
-        <div className="editor-inspector-header">
-          <div>
-            <span className="editor-inspector-kicker">Selected Block</span>
-            <h3>{getBlockInspectorTitle(blockNode)}</h3>
-          </div>
-          <MousePointerSquareDashed size={18} className="lucide-icon" />
-        </div>
-        {selectedNode ? (
-          <PropertyPanelHost />
-        ) : (
-          <ActiveBlockSettings node={selectedBlockNode} pos={selectedBlockPos} />
-        )}
-      </aside>
-    );
-  }
-
   const sections = runtime.getInspectorSectionsByMode('document');
+  const selectedBlock = selectedNode || selectedBlockNode;
+  const header = getInspectorHeader(activeTab, selectedBlock);
+  const HeaderIcon = header.icon;
 
   return (
-    <aside className="editor-inspector-shell" data-inspector-mode="document">
+    <aside className="editor-inspector-shell" data-inspector-mode={activeTab === 'inspector' ? 'block' : 'document'}>
       <div className="editor-inspector-header">
         <div>
-          <span className="editor-inspector-kicker">Inspector</span>
-          <h3>Document</h3>
+          <span className="editor-inspector-kicker">{header.kicker}</span>
+          <h3>{header.title}</h3>
         </div>
-        <FileText size={18} className="lucide-icon" />
+        <HeaderIcon size={18} className="lucide-icon" />
       </div>
       <div className="editor-inspector-tabs" role="tablist" aria-label="Inspector sections">
-        {(['document', 'outline', 'blocks', 'history'] as InspectorTab[]).map((tab) => (
+        {INSPECTOR_TABS.map((tab) => (
           <button
-            key={tab}
+            key={tab.id}
             type="button"
             role="tab"
-            aria-selected={activeTab === tab}
-            className={`editor-inspector-tab ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
+            aria-selected={activeTab === tab.id}
+            className={`editor-inspector-tab ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
           >
-            {tab[0].toUpperCase() + tab.slice(1)}
+            {tab.label}
           </button>
         ))}
       </div>
       {activeTab === 'document' && (
         <div className="editor-inspector-section-list">
-          {documentContent || sections.map((section) => (
+          {documentContent}
+          {sections.filter((section) => !documentContent || section.id.includes(':')).map((section) => (
             <InspectorSection key={section.id} section={section} />
           ))}
+          {runtime.getSidebars().map((sidebar) => {
+            const Component = sidebar.component;
+            return <Component key={sidebar.id} editor={editor} />;
+          })}
         </div>
+      )}
+      {activeTab === 'inspector' && (
+        selectedBlock ? (
+          selectedNode ? <PropertyPanelHost /> : <ActiveBlockSettings node={selectedBlockNode} pos={selectedBlockPos} />
+        ) : (
+          <div className="editor-inspector-empty-state">
+            <MousePointerSquareDashed size={20} className="lucide-icon" />
+            <strong>No block selected</strong>
+            <span>Select a block in the editor to configure it here.</span>
+          </div>
+        )
       )}
       {activeTab === 'outline' && <OutlinePanel />}
       {activeTab === 'blocks' && <BlockStatistics stats={blockStats} />}
@@ -102,6 +121,25 @@ export function InspectorHost({ documentContent, historyContent }: InspectorHost
       )}
     </aside>
   );
+}
+
+function getInspectorHeader(activeTab: InspectorTab, selectedBlock: any | null) {
+  if (activeTab === 'inspector') {
+    return {
+      kicker: selectedBlock ? 'Selected Block' : 'Block Settings',
+      title: selectedBlock ? getBlockInspectorTitle(selectedBlock) : 'Inspector',
+      icon: MousePointerSquareDashed,
+    };
+  }
+
+  const headers: Record<Exclude<InspectorTab, 'inspector'>, { kicker: string; title: string; icon: LucideIcon }> = {
+    document: { kicker: 'Inspector', title: 'Document', icon: FileText },
+    outline: { kicker: 'Document Structure', title: 'Outline', icon: ListTree },
+    blocks: { kicker: 'Document Structure', title: 'Blocks', icon: LayoutList },
+    history: { kicker: 'Document Activity', title: 'History', icon: History },
+  };
+
+  return headers[activeTab];
 }
 
 function ActiveBlockSettings({ node, pos }: { node: any | null; pos: number | null }) {

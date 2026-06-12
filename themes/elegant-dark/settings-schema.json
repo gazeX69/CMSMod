@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "sections": {
+    "branding": {
+      "label": "Branding",
+      "fields": {
+        "logo": { "type": "media", "label": "Logo", "description": "Upload a neon-styled site logo to be displayed in the site header.", "default": "", "required": false },
+        "logoDark": { "type": "media", "label": "Logo Dark Mode", "description": "Logo variant optimized specifically for deep dark background surfaces.", "default": "", "required": false },
+        "favicon": { "type": "media", "label": "Favicon", "description": "Small icon displayed in the browser tab (recommended 32x32px PNG).", "default": "", "required": false },
+        "siteCover": { "type": "media", "label": "Site Cover / Social Image", "description": "Default background image for social sharing previews (Open Graph).", "default": "", "required": false }
+      }
+    },
+    "colors": {
+      "label": "Colors",
+      "fields": {
+        "primary": { "type": "color", "label": "Primary Color", "description": "Main brand color used for primary buttons, focus borders, and glowing active links.", "default": "#c084fc", "required": true },
+        "secondary": { "type": "color", "label": "Secondary Color", "description": "Supporting secondary neon color used for secondary buttons and accents.", "default": "#a78bfa", "required": true },
+        "accent": { "type": "color", "label": "Accent Color", "description": "Bright highlight neon color used for badges, alerts, and glowing borders.", "default": "#22d3ee", "required": true },
+        "background": { "type": "color", "label": "Background Color", "description": "Background color for the main body of the website (recommended deep dark).", "default": "#09090b", "required": true },
+        "surface": { "type": "color", "label": "Surface Color", "description": "Background color for cards, dropdown menus, sidebars, and glassmorphic panels.", "default": "#18181b", "required": true },
+        "text": { "type": "color", "label": "Text Color", "description": "Primary text color for body copy, paragraphs, and headings.", "default": "#f4f4f5", "required": true },
+        "link": { "type": "color", "label": "Link Color", "description": "Color for text links. Links will automatically transition to this color.", "default": "#c084fc", "required": true },
+        "textMuted": { "type": "color", "label": "Muted Text Color", "description": "Secondary text color for captions, dates, and secondary text.", "default": "#a1a1aa", "required": false }
+      }
+    },
+    "typography": {
+      "label": "Typography",
+      "fields": {
+        "bodyFont": { "type": "text", "label": "Body Font", "description": "Font family used globally for body text, paragraphs, and lists.", "default": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", "required": true },
+        "headingFont": { "type": "text", "label": "Heading Font", "description": "Font family used specifically for headings and titles (h1 through h6).", "default": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", "required": true },
+        "baseFontSize": { "type": "text", "label": "Base Font Size", "description": "Base font size for the website, determining all relative typography sizing.", "default": "16px", "required": true },
+        "lineHeight": { "type": "text", "label": "Line Height", "description": "Line height spacing for body copy, controlling readable distance between lines.", "default": "1.6", "required": true },
+        "contentWidth": { "type": "text", "label": "Content Width", "description": "Maximum width for article reading areas, optimized for readability.", "default": "800px", "required": true }
+      }
+    },
+    "layout": {
+      "label": "Layout",
+      "fields": {
+        "containerWidth": { "type": "text", "label": "Container Width", "description": "Maximum width of the entire page container, centering the website layout.", "default": "1100px", "required": true },
+        "sidebarPosition": {
+          "type": "select", "label": "Sidebar Position", "description": "Choose where widget columns appear on content pages, or disable the sidebar entirely.",
+          "default": "none", "required": true,
+          "options": [
+            { "label": "Left", "value": "left" },
+            { "label": "Right", "value": "right" },
+            { "label": "None", "value": "none" }
+          ]
+        },
+        "headerStyle": {
+          "type": "select", "label": "Header Style", "description": "Visual arrangement of the header, including glassmorphic, solid, or minimal layout.",
+          "default": "glassmorphic", "required": true,
+          "options": [
+            { "label": "Glassmorphic", "value": "glassmorphic" },
+            { "label": "Solid", "value": "solid" },
+            { "label": "Minimal", "value": "minimal" }
+          ]
+        },
+        "footerStyle": {
+          "type": "select", "label": "Footer Style", "description": "Visual arrangement of the footer, including default, centered, or minimal layout.",
+          "default": "default", "required": true,
+          "options": [
+            { "label": "Default", "value": "default" },
+            { "label": "Centered", "value": "centered" },
+            { "label": "Minimal", "value": "minimal" }
+          ]
+        }
+      }
+    },
+    "header": {
+      "label": "Header",
+      "fields": {
+        "showSearch": { "type": "boolean", "label": "Show Search", "description": "Show or hide the search icon/link in the site header.", "default": true, "required": false },
+        "showLogo": { "type": "boolean", "label": "Show Logo", "description": "Show the logo image instead of the text site title in the header.", "default": true, "required": false },
+        "stickyHeader": { "type": "boolean", "label": "Sticky Header", "description": "Keep the header visible at the top of the window while scrolling down the page.", "default": true, "required": false },
+        "headerHeight": { "type": "text", "label": "Header Height", "description": "Set the vertical height of the site header in pixels (e.g., 72px).", "default": "72px", "required": false }
+      }
+    },
+    "footer": {
+      "label": "Footer",
+      "fields": {
+        "footerText": { "type": "text", "label": "Footer Text", "description": "Short paragraph or description about your site displayed in the footer.", "default": "Built with Neon Elegance", "required": false },
+        "copyrightText": { "type": "text", "label": "Copyright Text", "description": "Copyright notice text. Supports dynamic placeholders: {year} and {siteName}.", "default": "© {year} {siteName}", "required": false },
+        "footerColumns": {
+          "type": "select", "label": "Footer Columns", "description": "Select how many widget columns are displayed side-by-side in the footer.",
+          "default": "3", "required": false,
+          "options": [
+            { "label": "1 Column", "value": "1" },
+            { "label": "2 Columns", "value": "2" },
+            { "label": "3 Columns", "value": "3" },
+            { "label": "4 Columns", "value": "4" }
+          ]
+        }
+      }
+    },
+    "navigation": {
+      "label": "Navigation",
+      "fields": {
+        "desktopMenuStyle": {
+          "type": "select", "label": "Desktop Menu Style", "description": "Visual layout style for the primary navigation menu on desktop screens.",
+          "default": "horizontal", "required": true,
+          "options": [
+            { "label": "Horizontal", "value": "horizontal" },
+            { "label": "Vertical", "value": "vertical" }
+          ]
+        },
+        "mobileMenuStyle": {
+          "type": "select", "label": "Mobile Menu Style", "description": "Visual interaction style for mobile viewports, such as a slide-out drawer.",
+          "default": "slide-out", "required": true,
+          "options": [
+            { "label": "Hamburger", "value": "hamburger" },
+            { "label": "Bottom Bar", "value": "bottom-bar" },
+            { "label": "Slide Out", "value": "slide-out" }
+          ]
+        },
+        "megaMenuEnable": { "type": "boolean", "label": "Mega Menu", "description": "Display a multi-column dropdown mega menu for top-level navigation items.", "default": false, "required": false }
+      }
+    },
+    "homepage": {
+      "label": "Homepage",
+      "fields": {
+        "homepageLayout": {
+          "type": "select", "label": "Homepage Layout", "description": "Select structural layout for the homepage (Default content, Magazine, or Landing page).",
+          "default": "landing", "required": true,
+          "options": [
+            { "label": "Default", "value": "default" },
+            { "label": "Magazine", "value": "magazine" },
+            { "label": "Landing", "value": "landing" }
+          ]
+        },
+        "heroEnable": { "type": "boolean", "label": "Hero Section", "description": "Display a large welcome banner at the top of the homepage.", "default": true, "required": false },
+        "heroTitle": { "type": "text", "label": "Hero Title", "description": "Large catchphrase or welcome title displayed inside the homepage hero banner.", "default": "Welcome to the Dark Side", "required": false },
+        "heroDescription": { "type": "textarea", "label": "Hero Description", "description": "Secondary introduction text displayed below the hero title.", "default": "A premium glassmorphic experience with glowing neon accents.", "required": false },
+        "heroButton": { "type": "text", "label": "Hero Button Text", "description": "Text label for the primary call-to-action button in the hero banner.", "default": "Explore", "required": false },
+        "heroButtonUrl": { "type": "url", "label": "Hero Button URL", "description": "Destination URL link when the hero call-to-action button is clicked.", "default": "/", "required": false }
+      }
+    },
+    "content": {
+      "label": "Content",
+      "fields": {
+        "showAuthor": { "type": "boolean", "label": "Show Author", "description": "Show or hide the author's name in the metadata block of posts.", "default": true, "required": false },
+        "showDate": { "type": "boolean", "label": "Show Date", "description": "Show or hide the publication date in the metadata block of posts.", "default": true, "required": false },
+        "showCategories": { "type": "boolean", "label": "Show Categories", "description": "Show or hide category labels in the metadata block of posts.", "default": true, "required": false },
+        "showTags": { "type": "boolean", "label": "Show Tags", "description": "Show or hide tags at the bottom or meta section of posts.", "default": true, "required": false },
+        "relatedContent": { "type": "boolean", "label": "Related Content", "description": "Display a list of related articles at the bottom of post pages.", "default": true, "required": false }
+      }
+    },
+    "media": {
+      "label": "Media",
+      "fields": {
+        "imageBorderRadius": { "type": "text", "label": "Image Border Radius", "description": "Set the corner rounding amount for all content images (e.g., 16px).", "default": "16px", "required": false },
+        "thumbnailRatio": {
+          "type": "select", "label": "Thumbnail Ratio", "description": "Select the crop ratio for content list thumbnail images (e.g. 16:9, 4:3).",
+          "default": "16:9", "required": false,
+          "options": [
+            { "label": "16:9", "value": "16:9" },
+            { "label": "4:3", "value": "4:3" },
+            { "label": "1:1", "value": "1:1" }
+          ]
+        },
+        "galleryLayout": {
+          "type": "select", "label": "Gallery Layout", "description": "Visual layout for image galleries (Grid, Masonry brick layout, or Carousel).",
+          "default": "masonry", "required": false,
+          "options": [
+            { "label": "Grid", "value": "grid" },
+            { "label": "Masonry", "value": "masonry" },
+            { "label": "Carousel", "value": "carousel" }
+          ]
+        }
+      }
+    },
+    "socialSharing": {
+      "label": "Social Sharing",
+      "fields": {
+        "defaultOgImage": { "type": "media", "label": "Default OG Image", "description": "Default background image for social sharing previews (Open Graph).", "default": "", "required": false },
+        "defaultTwitterImage": { "type": "media", "label": "Default Twitter Image", "description": "Default background image for Twitter sharing preview cards.", "default": "", "required": false },
+        "socialLinks": { "type": "textarea", "label": "Social Links", "description": "Social media profile URLs (one per line, e.g. https://twitter.com/myprofile).", "default": "", "required": false }
+      }
+    },
+    "glowEffects": {
+      "label": "Glow Effects",
+      "description": "Neon glow and glassmorphism controls unique to this theme.",
+      "fields": {
+        "glowIntensity": {
+          "type": "select", "label": "Glow Intensity", "description": "Intensity of the neon glow effect on cards, inputs, and borders.",
+          "default": "medium", "required": false,
+          "options": [
+            { "label": "Subtle", "value": "subtle" },
+            { "label": "Medium", "value": "medium" },
+            { "label": "Intense", "value": "intense" },
+            { "label": "Off", "value": "off" }
+          ]
+        },
+        "glowColor": { "type": "color", "label": "Glow Color", "description": "Base color for the neon glow effect surrounding panels and cards.", "default": "#c084fc", "required": false },
+        "glassBlur": { "type": "text", "label": "Glass Blur Amount", "description": "Backdrop blur strength for glassmorphic panels and header (e.g. 12px).", "default": "12px", "required": false },
+        "glassOpacity": { "type": "text", "label": "Glass Panel Opacity", "description": "Opacity / transparency level of glassmorphic card backgrounds (e.g. 0.6).", "default": "0.6", "required": false },
+        "borderGlow": { "type": "boolean", "label": "Border Glow", "description": "Enable glowing borders on cards, buttons, and panels.", "default": true, "required": false },
+        "gradientHeadings": { "type": "boolean", "label": "Gradient Headings", "description": "Apply custom gradient color effect to all site headings.", "default": true, "required": false }
+      }
+    },
+    "appearance": {
+      "label": "Appearance",
+      "fields": {
+        "enableDarkMode": { "type": "boolean", "label": "Enable Dark Mode", "description": "This theme is dark by default; toggling off switches to a light variant.", "default": true, "required": false },
+        "autoDetectSystem": { "type": "boolean", "label": "Auto Detect System", "description": "Detect browser preference and automatically switch color scheme.", "default": false, "required": false }
+      }
+    },
+    "designSystem": {
+      "label": "Design System",
+      "fields": {
+        "radiusSm": { "type": "text", "label": "Border Radius SM", "description": "Corner rounding for small interactive elements like badges, tags, and checkboxes.", "default": "6px", "required": false },
+        "radiusMd": { "type": "text", "label": "Border Radius MD", "description": "Corner rounding for medium elements like cards, buttons, and form inputs.", "default": "12px", "required": false },
+        "radiusLg": { "type": "text", "label": "Border Radius LG", "description": "Corner rounding for large sections, banners, modals, and container wrappers.", "default": "20px", "required": false },
+        "spacingSm": { "type": "text", "label": "Spacing SM", "description": "Base padding and margin unit for tight layouts and inner element spacing.", "default": "0.5rem", "required": false },
+        "spacingMd": { "type": "text", "label": "Spacing MD", "description": "Standard padding and margin unit for default spacing between sections.", "default": "1rem", "required": false },
+        "spacingLg": { "type": "text", "label": "Spacing LG", "description": "Wide padding and margin unit for page-level section layouts.", "default": "2rem", "required": false },
+        "shadowSm": { "type": "text", "label": "Shadow SM", "description": "Subtle elevation shadow for inputs, buttons, and small visual tags.", "default": "0 2px 4px rgba(0,0,0,0.3)", "required": false },
+        "shadowMd": { "type": "text", "label": "Shadow MD", "description": "Default elevation shadow for hover states, cards, and dropdown headers.", "default": "0 4px 15px rgba(0,0,0,0.4)", "required": false },
+        "shadowLg": { "type": "text", "label": "Shadow LG", "description": "Strong glow-enhanced elevation shadow for modals, popups, and floating alerts.", "default": "0 4px 30px rgba(0,0,0,0.5), 0 0 20px rgba(192,132,252,0.08)", "required": false },
+        "animationSpeed": { "type": "text", "label": "Animation Speed", "description": "CSS transition speed for hover states, glows, and interactive motions (e.g., 0.25s).", "default": "0.25s", "required": false }
+      }
+    },
+    "components": {
+      "label": "Components",
+      "fields": {
+        "buttonStyle": {
+          "type": "select", "label": "Button Style", "description": "Shape style for buttons, including rounded, pill-shaped, or square borders.",
+          "default": "pill", "required": false,
+          "options": [
+            { "label": "Rounded", "value": "rounded" },
+            { "label": "Pill", "value": "pill" },
+            { "label": "Square", "value": "square" },
+            { "label": "Neon Outline", "value": "neon-outline" }
+          ]
+        },
+        "cardStyle": {
+          "type": "select", "label": "Card Style", "description": "Visual layout style for content card containers (e.g. Glassmorphic, elevated shadow, bordered).",
+          "default": "glass", "required": false,
+          "options": [
+            { "label": "Glass (Frosted)", "value": "glass" },
+            { "label": "Elevated (Shadow)", "value": "elevated" },
+            { "label": "Bordered", "value": "bordered" },
+            { "label": "Flat", "value": "flat" }
+          ]
+        },
+        "formStyle": {
+          "type": "select", "label": "Form Style", "description": "Outline style for input fields (Standard Outlined, Filled backgrounds, or Underlined).",
+          "default": "outlined", "required": false,
+          "options": [
+            { "label": "Outlined", "value": "outlined" },
+            { "label": "Filled", "value": "filled" },
+            { "label": "Underline", "value": "underline" }
+          ]
+        },
+        "tableStyle": {
+          "type": "select", "label": "Table Style", "description": "Visual structure for tables (Striped alternating rows, Bordered grids, or Minimalist lines).",
+          "default": "bordered", "required": false,
+          "options": [
+            { "label": "Striped", "value": "striped" },
+            { "label": "Bordered", "value": "bordered" },
+            { "label": "Minimal", "value": "minimal" }
+          ]
+        }
+      }
+    },
+    "accessibility": {
+      "label": "Accessibility",
+      "fields": {
+        "highContrast": { "type": "boolean", "label": "High Contrast", "description": "Force high contrast text colors to comply with accessibility requirements.", "default": false, "required": false },
+        "largeFontMode": { "type": "boolean", "label": "Large Font Mode", "description": "Increase global font sizes to make reading easier for visually impaired users.", "default": false, "required": false },
+        "focusIndicator": { "type": "boolean", "label": "Focus Indicator", "description": "Enable prominent focus rings/outlines for keyboard accessibility navigation.", "default": true, "required": false }
+      }
+    },
+    "localization": {
+      "label": "Localization",
+      "fields": {
+        "dateFormat": {
+          "type": "select", "label": "Date Format", "description": "Date format displayed on posts and pages (e.g., YYYY-MM-DD or DD MMM YYYY).",
+          "default": "DD MMM YYYY", "required": false,
+          "options": [
+            { "label": "YYYY-MM-DD", "value": "YYYY-MM-DD" },
+            { "label": "DD/MM/YYYY", "value": "DD/MM/YYYY" },
+            { "label": "MM/DD/YYYY", "value": "MM/DD/YYYY" },
+            { "label": "DD MMM YYYY", "value": "DD MMM YYYY" }
+          ]
+        },
+        "timeFormat": {
+          "type": "select", "label": "Time Format", "description": "Time format displayed on posts and pages (24 Hour format or 12 Hour AM/PM).",
+          "default": "24h", "required": false,
+          "options": [
+            { "label": "24 Hour", "value": "24h" },
+            { "label": "12 Hour (AM/PM)", "value": "12h" }
+          ]
+        },
+        "rtlSupport": { "type": "boolean", "label": "RTL Support", "description": "Enable full RTL (Right-to-Left) layout support for Arabic, Hebrew, etc.", "default": false, "required": false }
+      }
+    },
+    "performance": {
+      "label": "Performance",
+      "fields": {
+        "lazyLoadImages": { "type": "boolean", "label": "Lazy Load Images", "description": "Enable lazy loading to speed up page loads by loading images only as they scroll into view.", "default": true, "required": false },
+        "animationDisable": { "type": "boolean", "label": "Disable Animations", "description": "Completely disable all CSS transitions, hover animations, and neon glow fade effects.", "default": false, "required": false },
+        "reduceMotion": { "type": "boolean", "label": "Reduce Motion", "description": "Disable motion effects if the visitor has enabled reduced-motion settings in their OS.", "default": true, "required": false }
+      }
+    },
+    "advanced": {
+      "label": "Advanced",
+      "fields": {
+        "customCss": { "type": "textarea", "label": "Custom CSS", "description": "Inject custom CSS styling rules directly into the site header. Useful for developers.", "default": "", "required": false }
+      }
+    }
+  }
+}

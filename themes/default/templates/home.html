@@ -1,6 +1,9 @@
-<div class="home-hero">
-  <h1>Welcome to {{ site.title }}</h1>
-  <p>{{ site.description }}</p>
+<div class="home-hero" data-hero-enabled="{{ theme.settings.homepage.heroEnable }}">
+  <h1>{{ theme.settings.homepage.heroTitle }}</h1>
+  <p class="hero-desc">{{ theme.settings.homepage.heroDescription }}</p>
+  <div class="hero-action">
+    <a href="{{ theme.settings.homepage.heroButtonUrl }}" class="hero-btn">{{ theme.settings.homepage.heroButton }}</a>
+  </div>
 </div>
 <article class="page-content">
   <h2>{{ page.title }}</h2>

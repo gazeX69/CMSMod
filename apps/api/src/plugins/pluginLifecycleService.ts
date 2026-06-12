@@ -8,6 +8,7 @@ import {
   pluginEvents,
   pluginMigrations,
   pluginPermissions,
+  packageVersions,
   plugins,
   settings,
 } from '../database/schema.js';
@@ -156,17 +157,18 @@ async function registerManifestContracts(manifest: PluginManifest) {
 
 async function runPluginMigrations(scanned: ScannedPlugin) {
   const manifest = scanned.manifest;
-  if (!manifest?.migrations?.directory) return;
+  if (!manifest?.migrations?.directory) return [];
 
   const migrationDir = path.resolve(scanned.pluginPath, manifest.migrations.directory);
   assertPathInside(scanned.pluginPath, migrationDir);
 
-  if (!fs.existsSync(migrationDir)) return;
+  if (!fs.existsSync(migrationDir)) return [];
 
   const migrationFiles = fs
     .readdirSync(migrationDir)
-    .filter((file) => file.endsWith('.sql'))
+    .filter((file) => file.endsWith('.sql') && !file.endsWith('.down.sql'))
     .sort();
+  const applied: string[] = [];
 
   for (const migrationFile of migrationFiles) {
     const migrationPath = path.join(migrationDir, migrationFile);
@@ -179,7 +181,11 @@ async function runPluginMigrations(scanned: ScannedPlugin) {
       .where(eq(pluginMigrations.pluginKey, manifest.id))
       .limit(1000);
 
-    if (existing.some((row) => row.migration === migrationFile)) continue;
+    const existingMigration = existing.find((row) => row.migration === migrationFile);
+    if (existingMigration) {
+      if (existingMigration.checksum !== checksum) throw new Error(`Applied migration checksum changed: ${migrationFile}`);
+      continue;
+    }
 
     const statements = migrationSql
       .split('--> statement-breakpoint')
@@ -197,7 +203,37 @@ async function runPluginMigrations(scanned: ScannedPlugin) {
       checksum,
       appliedAt: new Date(),
     });
+    applied.push(migrationFile);
   }
+  return applied;
+}
+
+async function rollbackPluginMigrations(scanned: ScannedPlugin, migrations: string[]) {
+  const manifest = scanned.manifest;
+  if (!manifest?.migrations?.directory) return;
+  const migrationDir = path.resolve(scanned.pluginPath, manifest.migrations.directory);
+  assertPathInside(scanned.pluginPath, migrationDir);
+  for (const migration of [...migrations].reverse()) {
+    const downPath = path.join(migrationDir, migration.replace(/\.sql$/, '.down.sql'));
+    if (!fs.existsSync(downPath)) throw new Error(`Rollback migration missing: ${path.basename(downPath)}`);
+    const statements = fs.readFileSync(downPath, 'utf8')
+      .split('--> statement-breakpoint')
+      .flatMap((chunk) => chunk.split(/;\s*(?:\r?\n|$)/))
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+    for (const statement of statements) await db.execute(sql.raw(statement));
+    await db.delete(pluginMigrations).where(sql`${pluginMigrations.pluginKey} = ${manifest.id} AND ${pluginMigrations.migration} = ${migration}`);
+  }
+}
+
+export async function rollbackPluginMigrationsNotInPackage(key: string, retainedMigrations: string[]) {
+  const scanned = findScannedPlugin(key);
+  if (!scanned?.manifest) throw new Error('Current plugin package is unavailable for rollback');
+  const existing = await db.select().from(pluginMigrations).where(eq(pluginMigrations.pluginKey, key)).limit(1000);
+  const retained = new Set(retainedMigrations);
+  const toRollback = existing.map((row) => row.migration).filter((migration) => !retained.has(migration));
+  await rollbackPluginMigrations(scanned, toRollback);
+  return toRollback;
 }
 
 export async function migratePlugin(key: string) {
@@ -340,11 +376,12 @@ export async function installPlugin(key: string) {
 
   try {
     for (const dependency of scanned.manifest.dependencies || []) {
-      const dependencyRecord = await getPluginRecord(dependency);
+      const dependencyId = typeof dependency === 'string' ? dependency : dependency.id;
+      const dependencyRecord = await getPluginRecord(dependencyId);
       const dependencyStatus = normalizeStatus(dependencyRecord?.status);
 
       if (!dependencyRecord || !['INSTALLED', 'ACTIVE', 'INACTIVE'].includes(dependencyStatus)) {
-        throw new Error(`Missing installed dependency: ${dependency}`);
+        if (typeof dependency !== 'object' || !dependency.optional) throw new Error(`Missing installed dependency: ${dependencyId}`);
       }
     }
 
@@ -367,7 +404,33 @@ export async function installPlugin(key: string) {
   }
 }
 
-export async function activatePlugin(key: string) {
+export async function applyPluginPackageVersion(key: string) {
+  await syncPluginsFromDisk();
+  const scanned = findScannedPlugin(key);
+  if (!scanned?.manifest) throw new Error('Plugin manifest is missing or invalid');
+  const previous = await getPluginRecord(key);
+  const previousStatus = normalizeStatus(previous?.status);
+  let applied: string[] = [];
+  try {
+    applied = await runPluginMigrations(scanned);
+    await ensurePluginStorage(scanned.manifest);
+    await registerManifestContracts(scanned.manifest);
+    const status: PluginStatus = previousStatus === 'ACTIVE' ? 'ACTIVE' : 'INSTALLED';
+    await setPluginStatus(key, status, {
+      version: scanned.manifest.version,
+      name: scanned.manifest.name,
+      description: scanned.manifest.description || null,
+      manifestJson: JSON.stringify(scanned.manifest),
+      installedAt: previous?.installedAt || new Date(),
+    });
+    return { status, appliedMigrations: applied };
+  } catch (error) {
+    if (applied.length > 0) await rollbackPluginMigrations(scanned, applied);
+    throw error;
+  }
+}
+
+export async function activatePlugin(key: string, app?: any) {
   const plugin = await getPluginRecord(key);
   if (!plugin) throw new Error('Plugin not found');
 
@@ -383,6 +446,12 @@ export async function activatePlugin(key: string) {
 
   await setPluginStatus(key, 'ACTIVE', { activatedAt: new Date() });
   await pluginEventBus.emit('plugin.activated', { pluginKey: key }, 'plugin-lifecycle');
+
+  if (app) {
+    const { loadPluginRuntime } = await import('./pluginRuntimeLoader.js');
+    await loadPluginRuntime(app, key);
+  }
+
   return { ok: true, status: 'ACTIVE' as PluginStatus };
 }
 
@@ -397,27 +466,61 @@ export async function deactivatePlugin(key: string) {
 
   await setPluginStatus(key, 'INACTIVE', { deactivatedAt: new Date() });
   await pluginEventBus.emit('plugin.deactivated', { pluginKey: key }, 'plugin-lifecycle');
+
+  try {
+    const { unloadPluginRuntime } = await import('./pluginRuntimeLoader.js');
+    unloadPluginRuntime(key);
+  } catch (err) {
+    // Ignore error if registry fails to update
+  }
+
   return { ok: true, status: 'INACTIVE' as PluginStatus };
 }
 
 export async function uninstallPlugin(key: string, mode: 'plugin-only' | 'full-clean' = 'plugin-only') {
   const plugin = await getPluginRecord(key);
   if (!plugin) throw new Error('Plugin not found');
+  const dependents = (await getPluginsWithManifest()).filter((candidate) =>
+    candidate.key !== key
+    && ['INSTALLED', 'ACTIVE', 'INACTIVE'].includes(candidate.status)
+    && (candidate.manifest?.dependencies || []).some((dependency: any) => (typeof dependency === 'string' ? dependency : dependency.id) === key)
+  );
+  if (dependents.length > 0) throw new Error(`Plugin is required by: ${dependents.map((item) => item.key).join(', ')}`);
+
+  try {
+    const { resetPluginRuntime } = await import('./pluginRuntimeLoader.js');
+    resetPluginRuntime(key);
+  } catch {
+    // Continue cleanup when no runtime was loaded.
+  }
+
+  const scanned = findScannedPlugin(key);
+  const manifest = scanned?.manifest || (plugin.manifestJson ? JSON.parse(plugin.manifestJson) : null);
 
   await db.delete(pluginPermissions).where(eq(pluginPermissions.pluginKey, key));
   await db.delete(pluginEvents).where(eq(pluginEvents.pluginKey, key));
 
   if (mode === 'full-clean') {
+    if (scanned?.manifest) {
+      const applied = await db.select().from(pluginMigrations).where(eq(pluginMigrations.pluginKey, key)).limit(1000);
+      await rollbackPluginMigrations(scanned, applied.map((row) => row.migration));
+    }
     await db.delete(settings).where(eq(settings.group, key));
     await db.delete(pluginMigrations).where(eq(pluginMigrations.pluginKey, key));
 
-    const scanned = findScannedPlugin(key);
-    const manifest = scanned?.manifest || (plugin.manifestJson ? JSON.parse(plugin.manifestJson) : null);
     if (manifest?.storage) {
       const storageRoot = getPluginStorageRoot(manifest);
       assertPathInside(storageBaseDir, storageRoot);
       fs.rmSync(storageRoot, { recursive: true, force: true });
     }
+  }
+
+
+  const managedVersions = await db.select().from(packageVersions).where(eq(packageVersions.packageId, key)).limit(1);
+  if (managedVersions.length > 0) {
+    const pluginPath = path.resolve(pluginsDir, key);
+    assertPathInside(pluginsDir, pluginPath);
+    fs.rmSync(pluginPath, { recursive: true, force: true });
   }
 
   await setPluginStatus(key, 'UNINSTALLED', {

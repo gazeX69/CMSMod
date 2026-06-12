@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  ArrowLeft, Save, Send, Plus, Search, Loader2, 
+  ArrowLeft, ArrowUp, ArrowDown, Save, Send, Plus, Search, Loader2,
   CheckCircle, Link, Image as ImageIcon, Globe, 
   X, AlertCircle, Eye, FileText, Columns3, Maximize2, Minimize2, Clock
 } from 'lucide-react';
+
 
 // Import Tiptap Extensions
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -19,9 +20,11 @@ import { EditorRuntime } from '../editor/core/EditorRuntime';
 import { InspectorHost } from '../editor/inspector';
 import { EditorModalShell } from '../editor/modals';
 import { EditorToolbarRibbon } from '../editor/toolbar';
-import { TextSelection } from '@tiptap/pm/state';
+import { Selection, TextSelection } from '@tiptap/pm/state';
+import { notifyEditorSaved, runEditorPublishChecks, setEditorDocumentContext } from '../plugins/adminRuntimeSdk';
+import { contentTypeRegistry } from '../services/ContentTypeRegistry';
 
-interface ArticleManagerProps {
+interface ContentManagerProps {
     user: any;
     apiFetch: (path: string, options?: RequestInit) => Promise<Response>;
     pluginsList?: any[];
@@ -30,10 +33,11 @@ interface ArticleManagerProps {
     setCurrentRoute: (route: string) => void;
     editingPostRouteId: number | null;
     setEditingPostRouteId: (postId: number | null) => void;
+    contentType: string;
 }
 
 type LinkModalRange = { from: number; to: number; empty: boolean };
-type WorkspaceTab = 'write' | 'preview' | 'history' | 'seo';
+type WorkspaceTab = 'write' | 'preview' | 'history';
 type CanvasWidth = 'narrow' | 'default' | 'wide' | 'full';
 type SlashCommandState = {
     open: boolean;
@@ -52,15 +56,33 @@ type HoveredBlockState = {
     top: number;
     left: number;
     height: number;
+    blockPos: number;
+    blockEndPos: number;
     insertPos: number;
     label: string;
+    canMoveUp: boolean;
+    canMoveDown: boolean;
+};
+type FeaturedImageValue = {
+    url: string;
+    assetUuid: string | null;
+    alt: string;
+    source: 'external' | 'media-library';
 };
 
-export default function ArticleManager({ user, apiFetch, pluginsList = [], postsSubView, setPostsSubView, setCurrentRoute, editingPostRouteId, setEditingPostRouteId }: ArticleManagerProps) {
+export default function ContentManager({ user, apiFetch, pluginsList = [], postsSubView, setPostsSubView, setCurrentRoute, editingPostRouteId, setEditingPostRouteId, contentType }: ContentManagerProps) {
+    const definition = contentTypeRegistry.get(contentType) || {
+        key: contentType,
+        singular: 'Item',
+        plural: 'Items',
+        apiBasePath: `/api/${contentType}s`
+    };
     const [posts, setPosts] = useState<any[]>([]);
     const [loadingPosts, setLoadingPosts] = useState<boolean>(false);
     const [editingPostId, setEditingPostId] = useState<number | null>(null);
+    const [editingPostUuid, setEditingPostUuid] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState<string>('');
+
 
     const [editorTitle, setEditorTitle] = useState('');
     const [editorSlug, setEditorSlug] = useState('');
@@ -70,6 +92,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
     const [editorStatus, setEditorStatus] = useState<'draft' | 'published' | 'archived'>('draft');
     const [editorCategoryIds, setEditorCategoryIds] = useState<number[]>([]);
     const [editorTagIds, setEditorTagIds] = useState<number[]>([]);
+    const [featuredImage, setFeaturedImage] = useState<FeaturedImageValue | null>(null);
 
     const [isEditorSaving, setIsEditorSaving] = useState(false);
     const [editorError, setEditorError] = useState<string | null>(null);
@@ -78,6 +101,9 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
     const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
     const autosaveTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const autosaveInFlightRef = useRef(false);
+    const autosavePromiseRef = useRef<Promise<number | null> | null>(null);
+    const publishInFlightRef = useRef(false);
+    const editingPostIdRef = useRef<number | null>(null);
     const lastSavedSnapshotRef = useRef('');
     const autoDraftCreatedRef = useRef(false);
     const pendingLinkRangeRef = useRef<{ from: number; to: number } | null>(null);
@@ -103,8 +129,12 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
     const slashCommandIndexRef = useRef(0);
     const slashCommandItemsRef = useRef<Array<{ id: string; label: string; hint: string }>>([]);
 
+    useEffect(() => {
+        editingPostIdRef.current = editingPostId;
+    }, [editingPostId]);
+
     // STATE UNTUK CUSTOM MODAL INSERT (LINK & IMAGE)
-    const [insertModalConfig, setInsertModalConfig] = useState<{ type: 'link' | 'image', title: string } | null>(null);
+    const [insertModalConfig, setInsertModalConfig] = useState<{ type: 'link' | 'image' | 'featured-image', title: string } | null>(null);
     const [insertModalText, setInsertModalText] = useState('');
     const [insertModalValue, setInsertModalValue] = useState('');
     const [selectedInsertSourceId, setSelectedInsertSourceId] = useState<string>('');
@@ -133,6 +163,31 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         const text = editorBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
         return text ? text.split(' ').length : 0;
     }, [editorBody]);
+
+    const getDocumentContext = React.useCallback(() => ({
+        contentUuid: editingPostUuid,
+        contentType,
+        title: editorTitle,
+        slug: editorSlug,
+        excerpt: editorExcerpt,
+        status: editorStatus,
+        bodyHtml: editorBody,
+        dirty: autosaveStatus === 'unsaved',
+    }), [contentType, editingPostUuid, editorTitle, editorSlug, editorExcerpt, editorStatus, editorBody, autosaveStatus]);
+
+    useEffect(() => {
+        setEditorDocumentContext(getDocumentContext());
+        return () => setEditorDocumentContext(null);
+    }, [getDocumentContext]);
+
+    const notifySaved = async (contentUuid: string) => {
+        const failures = await notifyEditorSaved({
+            ...getDocumentContext(),
+            contentUuid,
+            saveId: crypto.randomUUID(),
+        });
+        if (failures.length > 0) setEditorError(`Plugin save warnings: ${failures.join('; ')}`);
+    };
     const readabilityLabel = wordCount < 300 ? 'Short' : wordCount < 900 ? 'Comfortable' : 'Long form';
     const formatLastSaved = () => {
         if (!lastSavedAt) return 'Not saved yet';
@@ -151,7 +206,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
             { id: 'quote', label: 'Quote', hint: 'Highlighted citation' },
             { id: 'code', label: 'Code Block', hint: 'Preformatted code' },
             { id: 'divider', label: 'Divider', hint: 'Horizontal separator' },
-            { id: 'image', label: 'Image', hint: 'Open media picker' },
+            { id: 'image', label: 'Media', hint: 'Insert image, video, audio, PDF, or document' },
         ];
         return items.filter((item) => {
             if (!query) return true;
@@ -478,7 +533,11 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
 
     function updateHoveredBlockFromEvent(event: React.MouseEvent<HTMLDivElement>) {
         if (!editor) return;
-        const blockState = getBlockStateFromTarget(event.target, event.currentTarget);
+        const target = event.target;
+        if (target instanceof HTMLElement && target.closest('.editor-block-handle')) {
+            return;
+        }
+        const blockState = getBlockStateFromTarget(target, event.currentTarget);
 
         if (!blockState) {
             setHoveredBlock(null);
@@ -488,7 +547,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         setHoveredBlock(blockState);
     }
 
-    function selectBlockFromEvent(event: React.MouseEvent<HTMLDivElement>) {
+    function selectBlockFromEvent(event: React.MouseEvent<HTMLDivElement> | React.PointerEvent<HTMLDivElement>) {
         const target = event.target;
         if (target instanceof HTMLElement && target.closest('.editor-block-handle')) {
             return;
@@ -512,7 +571,9 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         const blockRect = block.getBoundingClientRect();
 
         try {
-            const pos = editor.view.posAtDOM(block, 0);
+            const domPos = editor.view.posAtDOM(block, 0);
+            const $domPos = editor.state.doc.resolve(domPos);
+            const pos = $domPos.depth > 0 ? $domPos.before(1) : domPos;
             const node = editor.state.doc.nodeAt(pos);
             const insertPos = node ? pos + node.nodeSize : editor.state.doc.content.size;
 
@@ -520,8 +581,12 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                 top: blockRect.top - wrapperRect.top,
                 left: blockRect.left - wrapperRect.left - 64,
                 height: blockRect.height,
+                blockPos: pos,
+                blockEndPos: insertPos,
                 insertPos,
                 label: getEditorBlockLabel(node?.type?.name, node?.attrs),
+                canMoveUp: pos > 0,
+                canMoveDown: insertPos < editor.state.doc.content.size,
             };
         } catch {
             return null;
@@ -546,6 +611,29 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         slashCommandRef.current = nextState;
         setSlashCommand(nextState);
         setSlashCommandIndex(0);
+    }
+
+    function moveBlockByDirection(block: HoveredBlockState, direction: 'up' | 'down') {
+        if (!editor) return;
+
+        const blocks: Array<{ pos: number; node: any }> = [];
+        editor.state.doc.forEach((node, offset) => blocks.push({ pos: offset, node }));
+        const currentIndex = blocks.findIndex(({ pos }) => pos === block.blockPos);
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= blocks.length) return;
+
+        const current = blocks[currentIndex];
+        const target = blocks[targetIndex];
+        const insertPos = direction === 'up' ? target.pos : target.pos + target.node.nodeSize;
+        const tr = editor.state.tr.delete(current.pos, current.pos + current.node.nodeSize);
+        const mappedInsertPos = tr.mapping.map(insertPos);
+        tr.insert(mappedInsertPos, current.node);
+        tr.setSelection(Selection.near(tr.doc.resolve(mappedInsertPos)));
+        editor.view.dispatch(tr.scrollIntoView());
+        editor.view.focus();
+        setHoveredBlock(null);
+        setSelectedBlock(null);
     }
 
     function getEditorBlockLabel(nodeType?: string, attrs?: Record<string, any>) {
@@ -622,7 +710,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
             const sources = availableInsertSources;
             setSelectedInsertSourceId(sources.length === 1 ? sources[0].id : '');
             setInsertModalValue('');
-            setInsertModalConfig({ type: 'image', title: 'Insert Image' });
+            setInsertModalConfig({ type: 'image', title: 'Insert Media' });
         }
     }
 
@@ -638,7 +726,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
             const sources = availableInsertSources;
             setSelectedInsertSourceId(sources.length === 1 ? sources[0].id : '');
             setInsertModalValue('');
-            setInsertModalConfig({ type: 'image', title: 'Insert Image' });
+            setInsertModalConfig({ type: 'image', title: 'Insert Media' });
             return;
         }
 
@@ -694,13 +782,13 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
     const loadPosts = async () => {
         setLoadingPosts(true);
         try {
-            const res = await apiFetch('/api/posts');
+            const res = await apiFetch(definition.apiBasePath);
             if (res.ok) {
                 const data = await res.json();
                 setPosts(data);
             }
         } catch (err) {
-            console.error('Failed to load posts:', err);
+            console.error(`Failed to load ${definition.plural.toLowerCase()}:`, err);
         } finally {
             setLoadingPosts(false);
         }
@@ -708,13 +796,15 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
 
     const buildArticlePayload = (status: 'published' | 'draft' | 'archived') => {
         return {
-                title: editorTitle || 'Untitled Article',
+                title: editorTitle || 'Untitled ' + definition.singular,
                 slug: editorSlug,
                 excerpt: editorExcerpt,
                 body: editorBody,
-            status,
+                status,
+                type: contentType,
                 categoryIds: editorCategoryIds,
                 tagIds: editorTagIds,
+                featuredImage,
             };
     };
 
@@ -722,13 +812,11 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         return JSON.stringify(payload);
     };
 
-    const saveDraft = async ({ silent = false }: { silent?: boolean } = {}) => {
-        if (autosaveInFlightRef.current) {
-            return;
-        }
+    const saveDraft = async ({ silent = false }: { silent?: boolean } = {}): Promise<number | null> => {
+        if (autosavePromiseRef.current) return autosavePromiseRef.current;
 
         if (postsSubView === 'create' && !editorTitle.trim()) {
-            return;
+            return editingPostIdRef.current;
         }
 
         const postStatus = postsSubView === 'create' ? 'draft' : editorStatus;
@@ -736,81 +824,85 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         const snapshot = createPayloadSnapshot(payload);
 
         if (snapshot === lastSavedSnapshotRef.current) {
-            return;
+            return editingPostIdRef.current;
         }
 
-        const isCreatingDraft = postsSubView === 'create';
-
-        if (isCreatingDraft && autoDraftCreatedRef.current) {
-            return;
+        if (postsSubView === 'create' && autoDraftCreatedRef.current) {
+            return editingPostIdRef.current;
         }
 
-        autosaveInFlightRef.current = true;
-        setAutosaveStatus('saving');
+        const operation = (async (): Promise<number | null> => {
+            autosaveInFlightRef.current = true;
+            setAutosaveStatus('saving');
 
-        if (!silent) {
-            setIsEditorSaving(true);
-            setEditorError(null);
-            setEditorSuccess(null);
-        }
+            if (!silent) {
+                setIsEditorSaving(true);
+                setEditorError(null);
+                setEditorSuccess(null);
+            }
 
-        try {
-            const path = postsSubView === 'edit' && editingPostId
-                ? `/api/posts/${editingPostId}`
-                : `/api/posts`;
+            try {
+                const currentPostId = editingPostIdRef.current;
+                const path = currentPostId ? `${definition.apiBasePath}/${currentPostId}` : definition.apiBasePath;
+                const method = currentPostId ? 'PUT' : 'POST';
 
-            const method = postsSubView === 'edit' ? 'PUT' : 'POST';
+                const res = await apiFetch(path, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
 
-            const res = await apiFetch(path, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
+                if (!res.ok) {
+                    setAutosaveStatus('error');
+                    if (!silent) {
+                        const errData = await res.json();
+                        setEditorError(errData.error || `Failed to save ${definition.singular.toLowerCase()}.`);
+                    }
+                    return currentPostId;
+                }
 
-            if (res.ok) {
                 lastSavedSnapshotRef.current = snapshot;
                 setLastSavedAt(new Date());
                 setAutosaveStatus('saved');
+                let savedPostId = currentPostId;
+                let savedUuid = editingPostUuid;
 
-                if (!silent) {
-                    setEditorSuccess(postsSubView === 'edit' ? 'Article updated successfully!' : 'Article draft created successfully!');
-                }
-
-                if (isCreatingDraft) {
+                if (!currentPostId) {
                     const data = await res.json();
-                    const createdPostId = data.article.id;
+                    savedPostId = data.article?.id || data.page?.id || data.id || data.content?.id;
+                    savedUuid = data.article?.uuid || data.page?.uuid || data.uuid || data.content?.uuid;
+                    setEditingPostUuid(savedUuid);
+                    editingPostIdRef.current = savedPostId;
                     autoDraftCreatedRef.current = true;
-                    setEditingPostId(createdPostId);
-                    setEditingPostRouteId(createdPostId);
+                    setEditingPostId(savedPostId);
+                    setEditingPostRouteId(savedPostId);
                     setPostsSubView('edit');
                 }
+                if (savedUuid) await notifySaved(savedUuid);
 
                 if (!silent) {
+                    setEditorSuccess(currentPostId ? `${definition.singular} updated successfully!` : `${definition.singular} draft created successfully!`);
                     loadPosts();
                 }
-            } else {
+                return savedPostId;
+            } catch (err) {
+                console.error('Save error:', err);
                 setAutosaveStatus('error');
-
                 if (!silent) {
-                    const errData = await res.json();
-                    setEditorError(errData.error || 'Failed to save article.');
+                    setEditorError(`Network error: Failed to save ${definition.singular.toLowerCase()}.`);
                 }
+                return editingPostIdRef.current;
+            } finally {
+                autosaveInFlightRef.current = false;
+                if (!silent) setIsEditorSaving(false);
             }
-        } catch (err) {
-            console.error('Save error:', err);
-            setAutosaveStatus('error');
+        })();
 
-            if (!silent) {
-                setEditorError('Network error: Failed to save article.');
-            }
+        autosavePromiseRef.current = operation;
+        try {
+            return await operation;
         } finally {
-            autosaveInFlightRef.current = false;
-
-            if (!silent) {
-                setIsEditorSaving(false);
-            }
+            if (autosavePromiseRef.current === operation) autosavePromiseRef.current = null;
         }
     };
 
@@ -820,26 +912,43 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
             return;
         }
 
-        setIsEditorSaving(true);
+        if (publishInFlightRef.current) return;
         setEditorError(null);
         setEditorSuccess(null);
 
         const postStatus = statusOverride || editorStatus;
 
         if (postStatus === 'published' && (!editorTitle.trim() || !editorSlug.trim() || !editorBody.trim())) {
-            setEditorError('Title, Slug, and Body are required to publish this article.');
+            setEditorError(`Title, Slug, and Body are required to publish this ${definition.singular.toLowerCase()}.`);
             setIsEditorSaving(false);
             return;
         }
 
-        try {
-            const payload = buildArticlePayload(postStatus);
+        if (postStatus === 'published') {
+            const checks = await runEditorPublishChecks(getDocumentContext());
+            const blocked = checks.find((check) => check.status === 'block');
+            if (blocked) {
+                setEditorError(blocked.message || `Publishing blocked by ${blocked.owner}`);
+                return;
+            }
+            const warnings = checks.filter((check) => check.status === 'warning');
+            if (warnings.length > 0) setEditorError(warnings.map((warning) => warning.message || `${warning.owner} warning`).join('; '));
+        }
 
-            const path = postsSubView === 'edit' && editingPostId 
-                ? `/api/posts/${editingPostId}` 
-                : `/api/posts`;
-            
-            const method = postsSubView === 'edit' ? 'PUT' : 'POST';
+        publishInFlightRef.current = true;
+        setIsEditorSaving(true);
+
+        try {
+            if (autosaveTimerRef.current) {
+                window.clearTimeout(autosaveTimerRef.current);
+                autosaveTimerRef.current = null;
+            }
+            if (autosavePromiseRef.current) await autosavePromiseRef.current;
+
+            const payload = buildArticlePayload(postStatus);
+            const currentPostId = editingPostIdRef.current;
+            const path = currentPostId ? `${definition.apiBasePath}/${currentPostId}` : definition.apiBasePath;
+            const method = currentPostId ? 'PUT' : 'POST';
 
             const res = await apiFetch(path, {
                 method,
@@ -852,23 +961,33 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
             if (res.ok) {
                 lastSavedSnapshotRef.current = createPayloadSnapshot(payload);
                 setLastSavedAt(new Date());
-                setEditorSuccess(postsSubView === 'edit' ? 'Article updated successfully!' : 'Article draft created successfully!');
-                if (postsSubView === 'create') {
-                const data = await res.json();
-                const createdPostId = data.article.id;
-                setEditingPostId(createdPostId);
-                setEditingPostRouteId(createdPostId);
-                setPostsSubView('edit');
+                setAutosaveStatus('saved');
+                setEditorStatus(postStatus);
+                setEditorSuccess(postStatus === 'published' ? `${definition.singular} published successfully!` : `${definition.singular} saved successfully!`);
+                if (!currentPostId) {
+                    const data = await res.json();
+                    const createdPostId = data.article?.id || data.page?.id || data.id || data.content?.id;
+                    const createdUuid = data.article?.uuid || data.page?.uuid || data.uuid || data.content?.uuid;
+                    setEditingPostUuid(createdUuid);
+                    editingPostIdRef.current = createdPostId;
+                    autoDraftCreatedRef.current = true;
+                    setEditingPostId(createdPostId);
+                    setEditingPostRouteId(createdPostId);
+                    setPostsSubView('edit');
+                    if (createdUuid) await notifySaved(createdUuid);
+                } else if (editingPostUuid) {
+                    await notifySaved(editingPostUuid);
                 }
                 loadPosts();
             } else {
                 const errData = await res.json();
-                setEditorError(errData.error || 'Failed to save article.');
+                setEditorError(errData.error || `Failed to save ${definition.singular.toLowerCase()}.`);
             }
         } catch (err) {
             console.error('Save error:', err);
-            setEditorError('Network error: Failed to save article.');
+            setEditorError(`Network error: Failed to save ${definition.singular.toLowerCase()}.`);
         } finally {
+            publishInFlightRef.current = false;
             setIsEditorSaving(false);
         }
     };
@@ -940,10 +1059,11 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
 
     const startEditPost = async (postId: number) => {
         try {
-            const res = await apiFetch(`/api/posts/${postId}`);
+            const res = await apiFetch(`${definition.apiBasePath}/${postId}`);
             if (res.ok) {
                 const data = await res.json();
                 setEditingPostId(postId);
+                setEditingPostUuid(data.uuid || null);
                 setEditingPostRouteId(postId);
                 setEditorTitle(data.title);
                 setEditorSlug(data.slug);
@@ -954,17 +1074,26 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                 setEditorBody(data.body || '');
                 editor?.commands.setContent(data.body || '');
 
-                setEditorStatus(data.status);
+                 setEditorStatus(data.status);
                 setEditorCategoryIds(data.categoryIds || []);
                 setEditorTagIds(data.tagIds || []);
+                const loadedFeaturedImage = data.featuredImageUrl ? {
+                    url: data.featuredImageUrl,
+                    assetUuid: data.featuredImageAssetUuid || null,
+                    alt: data.featuredImageAlt || '',
+                    source: data.featuredImageSource === 'media-library' ? 'media-library' as const : 'external' as const,
+                } : null;
+                setFeaturedImage(loadedFeaturedImage);
                 lastSavedSnapshotRef.current = createPayloadSnapshot({
-                    title: data.title || 'Untitled Article',
+                    title: data.title || 'Untitled ' + definition.singular,
                     slug: data.slug,
                     excerpt: data.excerpt || '',
                     body: data.body || '',
                     status: data.status,
+                    type: contentType,
                     categoryIds: data.categoryIds || [],
                     tagIds: data.tagIds || [],
+                    featuredImage: loadedFeaturedImage,
                 });
                 setLastSavedAt(new Date());
                 autoDraftCreatedRef.current = true;
@@ -983,10 +1112,18 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         }
     }, [postsSubView, editingPostRouteId, editingPostId]);
 
+    const getPublicUrl = (s: string) => {
+        const hostname = 'http://localhost:5173';
+        if (contentType === 'page') {
+            return s === 'home' ? hostname : `${hostname}/${s}`;
+        }
+        return `${hostname}/articles/${s}`;
+    };
+
     const deletePost = async (postId: number) => {
-        if (!confirm('Are you sure you want to delete this article?')) return;
+        if (!confirm(`Are you sure you want to delete this ${definition.singular.toLowerCase()}?`)) return;
         try {
-            const res = await apiFetch(`/api/posts/${postId}`, {
+            const res = await apiFetch(`${definition.apiBasePath}/${postId}`, {
                 method: 'DELETE',
             });
             if (res.ok) {
@@ -999,6 +1136,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
 
     const initNewPost = () => {
         setEditingPostId(null);
+        setEditingPostUuid(null);
         setEditingPostRouteId(null);
         lastSavedSnapshotRef.current = '';
         autoDraftCreatedRef.current = false;
@@ -1014,6 +1152,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         setEditorStatus('draft');
         setEditorCategoryIds([]);
         setEditorTagIds([]);
+        setFeaturedImage(null);
         setPostsSubView('create');
         setEditorError(null);
         setEditorSuccess(null);
@@ -1023,7 +1162,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         setCanvasWidth('default');
         setFocusMode(false);
         setZenMode(false);
-        setCurrentRoute('posts');
+        setCurrentRoute(contentType === 'article' ? 'posts' : 'pages');
     };
 
     useEffect(() => {
@@ -1433,6 +1572,14 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
             .run();
     };
 
+    const insertPluginNodeAtSavedRange = (editorNode: { type: string; attrs?: Record<string, any> }) => {
+        if (!editor || !editorNode.type || !editor.schema.nodes[editorNode.type]) return false;
+        const range = restoreImageModalRange();
+        const content = [{ type: editorNode.type, attrs: editorNode.attrs || {} }, { type: 'paragraph' }];
+        if (!range) return editor.chain().focus().insertContent(content).run();
+        return editor.chain().focus().insertContentAt(normalizeBlockInsertRange(range), content).run();
+    };
+
     const insertExternalImageAtSavedRange = (result: {
         url: string;
         alt?: string;
@@ -1519,7 +1666,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
 
             if (
                 event.target instanceof Element &&
-                (event.target.closest('.editor-tabs-header') || event.target.closest('button[title="Insert Image"]'))
+                (event.target.closest('.editor-tabs-header') || event.target.closest('button[title="Insert Media"]'))
             ) {
                 editorFocusLeavingRef.current = true;
                 return;
@@ -1584,7 +1731,43 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
         captureImageModalRange();
         setSelectedInsertSourceId(sources.length === 1 ? sources[0].id : '');
         setInsertModalValue('');
-        setInsertModalConfig({ type: 'image', title: 'Insert Image' });
+        setInsertModalConfig({ type: 'image', title: 'Insert Media' });
+    };
+
+    const openFeaturedImagePicker = () => {
+        const sources = availableInsertSources;
+        setSelectedInsertSourceId(sources.length === 1 ? sources[0].id : '');
+        setInsertModalConfig({ type: 'featured-image', title: featuredImage ? 'Replace Featured Image' : 'Set Featured Image' });
+    };
+
+    const setFeaturedImageFromResult = (result: { uuid?: string; url?: string; alt?: string; caption?: string } | null) => {
+        if (!result) {
+            closeInsertModal();
+            return;
+        }
+        if (result.uuid) {
+            setFeaturedImage({
+                url: `/api/media/resolve/${result.uuid}`,
+                assetUuid: result.uuid,
+                alt: result.alt || '',
+                source: 'media-library',
+            });
+            closeInsertModal();
+            return;
+        }
+        const url = result.url?.trim() || '';
+        if (!/^https?:\/\//i.test(url)) {
+            setEditorError('Featured image URL must use http or https.');
+            return;
+        }
+        setFeaturedImage({ url, assetUuid: null, alt: result.alt || '', source: 'external' });
+        closeInsertModal();
+    };
+
+    const resolveFeaturedImagePreview = (url: string) => {
+        if (!url.startsWith('/')) return url;
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4000';
+        return `${apiUrl}${url}`;
     };
 
     const documentInspectorContent = (
@@ -1594,7 +1777,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
               <Globe size={15} className="lucide-icon" />
               <div>
                 <h4>Publishing</h4>
-                <p>Status and public visibility for this article.</p>
+                <p>Status and public visibility for this {definition.singular.toLowerCase()}.</p>
               </div>
             </div>
             <div className="workspace-meta-list">
@@ -1636,118 +1819,145 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
             <div className="workspace-field-counter">{editorExcerpt.length}/300 chars</div>
             <textarea
               className="settings-textarea workspace-inspector-textarea"
-              placeholder="Summarize the article content..."
+              placeholder={`Summarize the ${definition.singular.toLowerCase()} content...`}
               maxLength={320}
               value={editorExcerpt}
               onChange={(e) => setEditorExcerpt(e.target.value)}
             />
           </section>
 
-          <section className="editor-inspector-section" data-inspector-section="categories">
-            <div className="editor-inspector-section-heading workspace-section-between">
-              <div>
-                <h4>Categories</h4>
-                <p>Group this article in the public archive.</p>
+          {contentType === 'article' && (
+            <section className="editor-inspector-section" data-inspector-section="categories">
+              <div className="editor-inspector-section-heading workspace-section-between">
+                <div>
+                  <h4>Categories</h4>
+                  <p>Group this article in the public archive.</p>
+                </div>
+                <button
+                  className="btn-inline-action"
+                  onClick={() => setShowAddCatForm(!showAddCatForm)}
+                >
+                  <Plus size={12} /> Add
+                </button>
               </div>
-              <button
-                className="btn-inline-action"
-                onClick={() => setShowAddCatForm(!showAddCatForm)}
-              >
-                <Plus size={12} /> Add
-              </button>
-            </div>
-            <div className="topbar-search workspace-inspector-search">
-              <Search size={12} className="search-icon" />
-              <input
-                type="text"
-                placeholder="Filter categories..."
-                value={searchCategoryQuery}
-                onChange={(e) => setSearchCategoryQuery(e.target.value)}
-              />
-            </div>
-            {showAddCatForm && (
-              <div className="workspace-inline-create">
+              <div className="topbar-search workspace-inspector-search">
+                <Search size={12} className="search-icon" />
                 <input
                   type="text"
-                  placeholder="New category..."
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Filter categories..."
+                  value={searchCategoryQuery}
+                  onChange={(e) => setSearchCategoryQuery(e.target.value)}
                 />
-                <button className="btn-primary-action" onClick={handleCreateCategoryInline}>Add</button>
               </div>
-            )}
-            <div className="category-checkbox-list">
-              {loadingTaxonomy ? (
-                <span className="workspace-muted">Loading...</span>
-              ) : allCategories.length === 0 ? (
-                <span className="workspace-muted">No categories found.</span>
-              ) : (
-                allCategories
-                  .filter(c => c.name.toLowerCase().includes(searchCategoryQuery.toLowerCase()))
-                  .map(cat => (
-                    <label key={cat.id} className="category-checkbox-item">
-                      <input
-                        type="checkbox"
-                        checked={editorCategoryIds.includes(cat.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setEditorCategoryIds([...editorCategoryIds, cat.id]);
-                          } else {
-                            setEditorCategoryIds(editorCategoryIds.filter(id => id !== cat.id));
-                          }
-                        }}
-                      />
-                      <span>{cat.name}</span>
-                    </label>
-                  ))
+              {showAddCatForm && (
+                <div className="workspace-inline-create">
+                  <input
+                    type="text"
+                    placeholder="New category..."
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                  />
+                  <button className="btn-primary-action" onClick={handleCreateCategoryInline}>Add</button>
+                </div>
               )}
-            </div>
-          </section>
-
-          <section className="editor-inspector-section" data-inspector-section="tags">
-            <div className="editor-inspector-section-heading">
-              <div>
-                <h4>Tags</h4>
-                <p>Press Enter to attach or create tags.</p>
+              <div className="category-checkbox-list">
+                {loadingTaxonomy ? (
+                  <span className="workspace-muted">Loading...</span>
+                ) : allCategories.length === 0 ? (
+                  <span className="workspace-muted">No categories found.</span>
+                ) : (
+                  allCategories
+                    .filter(c => c.name.toLowerCase().includes(searchCategoryQuery.toLowerCase()))
+                    .map(cat => (
+                      <label key={cat.id} className="category-checkbox-item">
+                        <input
+                          type="checkbox"
+                          checked={editorCategoryIds.includes(cat.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditorCategoryIds([...editorCategoryIds, cat.id]);
+                            } else {
+                              setEditorCategoryIds(editorCategoryIds.filter(id => id !== cat.id));
+                            }
+                          }}
+                        />
+                        <span>{cat.name}</span>
+                      </label>
+                    ))
+                )}
               </div>
-            </div>
-            <div className="tag-badges-container">
-              {editorTagIds.map(tagId => {
-                const t = allTags.find(tag => tag.id === tagId);
-                if (!t) return null;
-                return (
-                  <span key={tagId} className="tag-badge">
-                    {t.name}
-                    <button onClick={() => setEditorTagIds(editorTagIds.filter(id => id !== tagId))}><X size={10} /></button>
-                  </span>
-                );
-              })}
-            </div>
-            <input
-              type="text"
-              placeholder="Type tag and press Enter..."
-              className="search-filter-input workspace-inspector-input"
-              value={tagInputText}
-              onChange={(e) => setTagInputText(e.target.value)}
+            </section>
+          )}
+
+          {contentType === 'article' && (
+            <section className="editor-inspector-section" data-inspector-section="tags">
+              <div className="editor-inspector-section-heading">
+                <div>
+                  <h4>Tags</h4>
+                  <p>Press Enter to attach or create tags.</p>
+                </div>
+              </div>
+              <div className="tag-badges-container">
+                {editorTagIds.map(tagId => {
+                  const t = allTags.find(tag => tag.id === tagId);
+                  if (!t) return null;
+                  return (
+                    <span key={tagId} className="tag-badge">
+                      {t.name}
+                      <button onClick={() => setEditorTagIds(editorTagIds.filter(id => id !== tagId))}><X size={10} /></button>
+                    </span>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                placeholder="Type tag and press Enter..."
+                className="search-filter-input workspace-inspector-input"
+                value={tagInputText}
+                onChange={(e) => setTagInputText(e.target.value)}
               onKeyDown={handleTagInputKeyDown}
             />
           </section>
+          )}
 
           <section className="editor-inspector-section" data-inspector-section="featured-image">
             <div className="editor-inspector-section-heading">
               <ImageIcon size={15} className="lucide-icon" />
               <div>
                 <h4>Featured Image</h4>
-                <p>Featured image selection remains unchanged.</p>
+                <p>Used by themes, previews, and social sharing.</p>
               </div>
             </div>
-            <div className="workspace-featured-placeholder">
-              <ImageIcon size={18} className="lucide-icon" />
-              <span>Select Image</span>
-            </div>
+            {featuredImage ? (
+              <div className="workspace-featured-card">
+                <img src={resolveFeaturedImagePreview(featuredImage.url)} alt={featuredImage.alt || 'Featured image preview'} />
+                <div className="workspace-featured-meta">
+                  <span>{featuredImage.source === 'media-library' ? 'Media Library' : 'External URL'}</span>
+                  <input
+                    type="text"
+                    className="workspace-inspector-input"
+                    placeholder="Alternative text"
+                    value={featuredImage.alt}
+                    onChange={(event) => setFeaturedImage({ ...featuredImage, alt: event.target.value })}
+                  />
+                  <div className="workspace-featured-actions">
+                    <button type="button" className="btn-inline-action" onClick={openFeaturedImagePicker}>Replace</button>
+                    <button type="button" className="btn-inline-action danger" onClick={() => setFeaturedImage(null)}>Remove</button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="workspace-featured-placeholder" onClick={openFeaturedImagePicker}>
+                <ImageIcon size={18} className="lucide-icon" />
+                <span>Select Image</span>
+                <small>Use a URL or explore your Media Library</small>
+              </button>
+            )}
           </section>
+
         </>
     );
+
 
     return(
         <EditorProvider editor={editor}>
@@ -1756,11 +1966,11 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                 <>
                   <div className="view-header-with-action">
                     <div className="header-text">
-                      <h2>Articles</h2>
-                      <p>Manage site articles, news, and blog content entries.</p>
+                      <h2>{definition.plural}</h2>
+                      <p>{contentType === 'article' ? 'Manage site articles, news, and blog content entries.' : `Manage site ${definition.plural.toLowerCase()} and content entries.`}</p>
                     </div>
                     <button className="btn-primary-action" onClick={initNewPost} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Plus size={16} className="lucide-icon" /> New Article
+                      <Plus size={16} className="lucide-icon" /> New {definition.singular}
                     </button>
                   </div>
 
@@ -1768,7 +1978,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                     <div className="filter-left">
                       <input 
                         type="text" 
-                        placeholder="Search posts..." 
+                        placeholder={`Search ${definition.plural.toLowerCase()}...`}
                         className="search-filter-input" 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -1780,7 +1990,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                     {loadingPosts ? (
                       <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                         <Loader2 className="lucide-icon animate-spin" size={24} style={{ marginBottom: '1rem' }} />
-                        <p>Loading articles...</p>
+                        <p>Loading {definition.plural.toLowerCase()}...</p>
                       </div>
                     ) : (
                       <div className="table-container">
@@ -1788,7 +1998,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                           <thead>
                             <tr>
                               <th>Title</th>
-                              <th>Categories</th>
+                              {contentType === 'article' && <th>Categories</th>}
                               <th>Status</th>
                               <th>Author</th>
                               <th>Published At</th>
@@ -1798,8 +2008,8 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                           <tbody>
                             {posts.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
                               <tr>
-                                <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                                  No articles found. Click "New Article" to create one!
+                                <td colSpan={contentType === 'article' ? 6 : 5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                                  No {definition.plural.toLowerCase()} found. Click "New {definition.singular}" to create one!
                                 </td>
                               </tr>
                             ) : (
@@ -1808,11 +2018,13 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                                 .map((post) => (
                                   <tr key={post.id}>
                                     <td><span className="title-bold">{post.title}</span></td>
-                                    <td>
-                                      {post.categories && post.categories.length > 0
-                                        ? post.categories.map((c: any) => c.name).join(', ')
-                                        : '-'}
-                                    </td>
+                                    {contentType === 'article' && (
+                                      <td>
+                                        {post.categories && post.categories.length > 0
+                                          ? post.categories.map((c: any) => c.name).join(', ')
+                                          : '-'}
+                                      </td>
+                                    )}
                                     <td>
                                       <span className={`status-badge ${post.status}`}>
                                         {post.status.toUpperCase()}
@@ -1846,12 +2058,12 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                         className="workspace-back-button" 
                         onClick={() => setPostsSubView('list')}
                       >
-                        <ArrowLeft size={14} /> Content
+                        <ArrowLeft size={14} /> {definition.plural}
                       </button>
                       <span className="workspace-breadcrumb-separator">&gt;</span>
-                      <span>Posts</span>
+                      <span>{definition.plural}</span>
                       <span className="workspace-breadcrumb-separator">&gt;</span>
-                      <span className="workspace-breadcrumb-current">{editorTitle || (postsSubView === 'create' ? 'New Article' : 'Edit Article')}</span>
+                      <span className="workspace-breadcrumb-current">{editorTitle || (postsSubView === 'create' ? `New ${definition.singular}` : `Edit ${definition.singular}`)}</span>
                       <span className={`status-badge ${editorStatus}`}>{editorStatus.toUpperCase()}</span>
                       {editorStatus === 'published' && <span className="status-badge published">PUBLISHED</span>}
                     </div>
@@ -1885,14 +2097,14 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                         className="btn-primary-action" 
                         disabled={isEditorSaving || !editorTitle.trim() || !editorSlug.trim() || !editorBody.trim()}
                         onClick={() => {
-                          if (confirm('Are you sure you want to publish this article live?')) {
+                          if (confirm(`Are you sure you want to publish this ${definition.singular.toLowerCase()} live?`)) {
                             handleSavePost('published');
                           }
                         }}
                         style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                       >
                         {isEditorSaving ? <Loader2 className="lucide-icon animate-spin" size={16} /> : <Send size={16} />}
-                        Publish Article
+                        Publish {definition.singular}
                       </button>
                     </div>
                   </div>
@@ -1919,7 +2131,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                         <div className="editor-title-group">
                           <input 
                             type="text" 
-                            placeholder="Enter article title..." 
+                            placeholder={`Enter ${definition.singular.toLowerCase()} title...`}
                             value={editorTitle}
                             onChange={(e) => {
                               setEditorTitle(e.target.value);
@@ -1933,7 +2145,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
 
                         <div className="permalink-display">
                           <span>Permalink: </span>
-                          <code>http://localhost:5173/articles/{editorSlug || '[slug]'}</code>
+                          <code>{getPublicUrl(editorSlug || '[slug]')}</code>
                           <button 
                             className="btn-inline-action" 
                             style={{ marginLeft: '0.5rem' }}
@@ -1963,7 +2175,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                       </div>
 
                       <div className="workspace-mode-tabs" role="tablist" aria-label="Editor workspace mode">
-                        {(['write', 'preview', 'history', 'seo'] as WorkspaceTab[]).map((tab) => (
+                        {(['write', 'preview', 'history'] as WorkspaceTab[]).map((tab) => (
                           <button
                             key={tab}
                             type="button"
@@ -1972,7 +2184,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                             className={workspaceTab === tab ? 'active' : ''}
                             onClick={() => setWorkspaceTab(tab)}
                           >
-                            {tab === 'seo' ? 'SEO' : tab === 'preview' ? 'Editor Preview' : tab[0].toUpperCase() + tab.slice(1)}
+                            {tab === 'preview' ? 'Editor Preview' : tab[0].toUpperCase() + tab.slice(1)}
                           </button>
                         ))}
                       </div>
@@ -1995,7 +2207,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                                     isWide={isWide}
                                     onClose={closeInsertModal}
                                 >
-                                    {insertModalConfig.type === 'image' && selectedInsertSourceId === '' ? (
+                                    {(insertModalConfig.type === 'image' || insertModalConfig.type === 'featured-image') && selectedInsertSourceId === '' ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                             {availableInsertSources.map(source => {
                                                 const SourceIcon = source.icon === 'globe' ? Globe : ImageIcon;
@@ -2014,15 +2226,24 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                                                 <button className="btn-inline-action" onClick={closeInsertModal}>Cancel</button>
                                             </div>
                                         </div>
-                                    ) : insertModalConfig.type === 'image' && selectedSource && selectedSource.render ? (
+                                    ) : (insertModalConfig.type === 'image' || insertModalConfig.type === 'featured-image') && selectedSource && selectedSource.render ? (
                                         (() => {
                                             const SourceComponent = selectedSource.render;
                                             return (
                                                 <SourceComponent
                                                     apiFetch={apiFetch}
+                                                    options={insertModalConfig.type === 'featured-image' ? { mimeTypes: ['image/*'], multiple: false } : { multiple: false }}
                                                     onSelect={(result) => {
+                                                        if (insertModalConfig.type === 'featured-image') {
+                                                            setFeaturedImageFromResult(result);
+                                                            return;
+                                                        }
                                                         if (result && editor) {
-                                                            if (result.uuid) {
+                                                            if (result.editorNode) {
+                                                                const inserted = insertPluginNodeAtSavedRange(result.editorNode);
+                                                                closeInsertModal();
+                                                                if (!inserted) setEditorError('The selected media type is not available in the editor.');
+                                                            } else if (result.uuid) {
                                                                 insertMediaAtSavedRange({
                                                                     uuid: result.uuid,
                                                                     alt: result.alt || '',
@@ -2146,7 +2367,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                                   if (button) {
                                     const buttonTitle = button.getAttribute('title');
 
-                                    if (buttonTitle === 'Insert Image') {
+                                    if (buttonTitle === 'Insert Media') {
                                       captureImageModalRange();
                                     } else {
                                       captureToolbarEditorRange();
@@ -2168,7 +2389,7 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                                   if (button) {
                                     const buttonTitle = button.getAttribute('title');
 
-                                    if (buttonTitle === 'Insert Image') {
+                                    if (buttonTitle === 'Insert Media') {
                                       captureImageModalRange();
                                     } else {
                                       captureToolbarEditorRange();
@@ -2195,6 +2416,9 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                                 className={`tiptap-editor-wrapper tiptap-editor-wrapper--${canvasWidth}`}
                                 onMouseMove={updateHoveredBlockFromEvent}
                                 onMouseLeave={() => setHoveredBlock(null)}
+                                onPointerDown={(event) => {
+                                    if (event.pointerType !== 'mouse') selectBlockFromEvent(event);
+                                }}
                                 onMouseDown={(event) => {
                                     selectBlockFromEvent(event);
                                     const position = editor?.view.posAtCoords({
@@ -2257,14 +2481,57 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                                     >
                                       <Plus size={14} />
                                     </button>
+                                    <div className="editor-block-move-actions" aria-label="Move block">
+                                      <button
+                                        type="button"
+                                        className="editor-block-move-button"
+                                        aria-label={`Move ${(selectedBlock || hoveredBlock)!.label} up`}
+                                        title="Move block up"
+                                        disabled={!(selectedBlock || hoveredBlock)!.canMoveUp}
+                                        onMouseDown={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          moveBlockByDirection((selectedBlock || hoveredBlock)!, 'up');
+                                        }}
+                                      >
+                                        <ArrowUp size={13} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="editor-block-move-button"
+                                        aria-label={`Move ${(selectedBlock || hoveredBlock)!.label} down`}
+                                        title="Move block down"
+                                        disabled={!(selectedBlock || hoveredBlock)!.canMoveDown}
+                                        onMouseDown={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          moveBlockByDirection((selectedBlock || hoveredBlock)!, 'down');
+                                        }}
+                                      >
+                                        <ArrowDown size={13} />
+                                      </button>
+                                    </div>
                                     <button
                                       type="button"
                                       className="editor-block-handle-grip"
-                                      aria-label="Block menu"
-                                      title={(selectedBlock || hoveredBlock)!.label}
+                                      data-block-pos={(selectedBlock || hoveredBlock)!.blockPos}
+                                      data-block-end-pos={(selectedBlock || hoveredBlock)!.blockEndPos}
+                                      data-block-label={(selectedBlock || hoveredBlock)!.label}
+                                      aria-label={`Move ${(selectedBlock || hoveredBlock)!.label} block`}
+                                      title={`Drag to move ${(selectedBlock || hoveredBlock)!.label}`}
                                       onMouseDown={(event) => {
-                                        event.preventDefault();
                                         event.stopPropagation();
+                                        setSelectedBlock(null);
+                                      }}
+                                      onKeyDown={(event) => {
+                                        if (event.key === 'ArrowUp' && (selectedBlock || hoveredBlock)!.canMoveUp) {
+                                          event.preventDefault();
+                                          moveBlockByDirection((selectedBlock || hoveredBlock)!, 'up');
+                                        }
+                                        if (event.key === 'ArrowDown' && (selectedBlock || hoveredBlock)!.canMoveDown) {
+                                          event.preventDefault();
+                                          moveBlockByDirection((selectedBlock || hoveredBlock)!, 'down');
+                                        }
                                       }}
                                     >
                                       <span />
@@ -2291,11 +2558,8 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                         ) : (
                           <WorkspaceSupportPanel
                             tab={workspaceTab}
-                            title={editorTitle || 'Untitled Article'}
-                            slug={editorSlug}
+                            title={editorTitle || 'Untitled ' + definition.singular}
                             status={editorStatus}
-                            excerpt={editorExcerpt}
-                            wordCount={wordCount}
                             versionLabel={editorVersionLabel}
                             lastSavedLabel={formatLastSaved()}
                           />
@@ -2334,105 +2598,109 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                       </div>
 
                       {/* Categories Panel */}
-                      <div className="editor-card glass">
-                        <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>Categories</span>
-                          <button 
-                            className="btn-inline-action" 
-                            style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                            onClick={() => setShowAddCatForm(!showAddCatForm)}
-                          >
-                            <Plus size={12} /> Add New
-                          </button>
-                        </h4>
+                      {contentType === 'article' && (
+                        <div className="editor-card glass">
+                          <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Categories</span>
+                            <button 
+                              className="btn-inline-action" 
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              onClick={() => setShowAddCatForm(!showAddCatForm)}
+                            >
+                              <Plus size={12} /> Add New
+                            </button>
+                          </h4>
 
-                        <div className="topbar-search" style={{ width: '100%', marginBottom: '0.75rem' }}>
-                          <Search size={12} className="search-icon" />
-                          <input 
-                            type="text" 
-                            placeholder="Filter categories..." 
-                            value={searchCategoryQuery}
-                            onChange={(e) => setSearchCategoryQuery(e.target.value)}
-                          />
-                        </div>
-
-                        {showAddCatForm && (
-                          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                          <div className="topbar-search" style={{ width: '100%', marginBottom: '0.75rem' }}>
+                            <Search size={12} className="search-icon" />
                             <input 
                               type="text" 
-                              placeholder="New category..." 
-                              value={newCatName}
-                              onChange={(e) => setNewCatName(e.target.value)}
-                              style={{ flexGrow: 1, padding: '0.35rem 0.5rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'white' }}
+                              placeholder="Filter categories..." 
+                              value={searchCategoryQuery}
+                              onChange={(e) => setSearchCategoryQuery(e.target.value)}
                             />
-                            <button 
-                              className="btn-primary-action" 
-                              style={{ padding: '0.35rem 0.60rem', fontSize: '0.75rem' }} 
-                              onClick={handleCreateCategoryInline}
-                            >
-                              Add
-                            </button>
                           </div>
-                        )}
 
-                        <div className="category-checkbox-list">
-                          {loadingTaxonomy ? (
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Loading...</span>
-                          ) : allCategories.length === 0 ? (
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No categories found.</span>
-                          ) : (
-                            allCategories
-                              .filter(c => c.name.toLowerCase().includes(searchCategoryQuery.toLowerCase()))
-                              .map(cat => (
-                                <label key={cat.id} className="category-checkbox-item">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={editorCategoryIds.includes(cat.id)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setEditorCategoryIds([...editorCategoryIds, cat.id]);
-                                      } else {
-                                        setEditorCategoryIds(editorCategoryIds.filter(id => id !== cat.id));
-                                      }
-                                    }}
-                                  />
-                                  <span>{cat.name}</span>
-                                </label>
-                              ))
+                          {showAddCatForm && (
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                              <input 
+                                type="text" 
+                                placeholder="New category..." 
+                                value={newCatName}
+                                onChange={(e) => setNewCatName(e.target.value)}
+                                style={{ flexGrow: 1, padding: '0.35rem 0.5rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'white' }}
+                              />
+                              <button 
+                                className="btn-primary-action" 
+                                style={{ padding: '0.35rem 0.60rem', fontSize: '0.75rem' }} 
+                                onClick={handleCreateCategoryInline}
+                              >
+                                Add
+                              </button>
+                            </div>
                           )}
+
+                          <div className="category-checkbox-list">
+                            {loadingTaxonomy ? (
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Loading...</span>
+                            ) : allCategories.length === 0 ? (
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No categories found.</span>
+                            ) : (
+                              allCategories
+                                .filter(c => c.name.toLowerCase().includes(searchCategoryQuery.toLowerCase()))
+                                .map(cat => (
+                                  <label key={cat.id} className="category-checkbox-item">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={editorCategoryIds.includes(cat.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setEditorCategoryIds([...editorCategoryIds, cat.id]);
+                                        } else {
+                                          setEditorCategoryIds(editorCategoryIds.filter(id => id !== cat.id));
+                                        }
+                                      }}
+                                    />
+                                    <span>{cat.name}</span>
+                                  </label>
+                                ))
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Tags Panel */}
-                      <div className="editor-card glass">
-                        <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                          Tags
-                        </h4>
-                        
-                        <div className="tag-badges-container">
-                          {editorTagIds.map(tagId => {
-                            const t = allTags.find(tag => tag.id === tagId);
-                            if (!t) return null;
-                            return (
-                              <span key={tagId} className="tag-badge">
-                                {t.name}
-                                <button onClick={() => setEditorTagIds(editorTagIds.filter(id => id !== tagId))}><X size={10} /></button>
-                              </span>
-                            );
-                          })}
-                        </div>
+                      {contentType === 'article' && (
+                        <div className="editor-card glass">
+                          <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                            Tags
+                          </h4>
+                          
+                          <div className="tag-badges-container">
+                            {editorTagIds.map(tagId => {
+                              const t = allTags.find(tag => tag.id === tagId);
+                              if (!t) return null;
+                              return (
+                                <span key={tagId} className="tag-badge">
+                                  {t.name}
+                                  <button onClick={() => setEditorTagIds(editorTagIds.filter(id => id !== tagId))}><X size={10} /></button>
+                                </span>
+                              );
+                            })}
+                          </div>
 
-                        <input 
-                          type="text" 
-                          placeholder="Type tag and press Enter..." 
-                          className="search-filter-input"
-                          style={{ width: '100%', fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}
-                          value={tagInputText}
-                          onChange={(e) => setTagInputText(e.target.value)}
-                          onKeyDown={handleTagInputKeyDown}
-                        />
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>Tags will be created automatically if they don't exist.</p>
-                      </div>
+                          <input 
+                            type="text" 
+                            placeholder="Type tag and press Enter..." 
+                            className="search-filter-input"
+                            style={{ width: '100%', fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}
+                            value={tagInputText}
+                            onChange={(e) => setTagInputText(e.target.value)}
+                            onKeyDown={handleTagInputKeyDown}
+                          />
+                          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>Tags will be created automatically if they don't exist.</p>
+                        </div>
+                      )}
 
                       {/* Featured Image */}
                       <div className="editor-card glass">
@@ -2443,21 +2711,6 @@ export default function ArticleManager({ user, apiFetch, pluginsList = [], posts
                         <div style={{ border: '1px dashed var(--border-color)', borderRadius: '8px', padding: '1.5rem 1rem', textAlign: 'center', cursor: 'pointer' }}>
                           <ImageIcon size={18} className="lucide-icon" style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }} />
                           <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--accent-purple)', fontWeight: 600 }}>Select Image</span>
-                        </div>
-                      </div>
-
-                      {/* SEO Preview */}
-                      <div className="editor-card glass">
-                        <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                          SEO Search Snippet
-                        </h4>
-                        
-                        <div className="seo-preview-box">
-                          <div className="seo-title">{editorTitle || 'Untitled Article'} - Modern CMS</div>
-                          <div className="seo-url">http://localhost:5173/articles/{editorSlug || 'new-article'}</div>
-                          <div className="seo-snippet">
-                            {editorExcerpt || 'Enter article summary to preview this snippet description on Google search results...'}
-                          </div>
                         </div>
                       </div>
 
@@ -2542,19 +2795,13 @@ function SlashCommandMenu({
 function WorkspaceSupportPanel({
     tab,
     title,
-    slug,
     status,
-    excerpt,
-    wordCount,
     versionLabel,
     lastSavedLabel,
 }: {
     tab: WorkspaceTab;
     title: string;
-    slug: string;
     status: string;
-    excerpt: string;
-    wordCount: number;
     versionLabel: string;
     lastSavedLabel: string;
 }) {
@@ -2576,26 +2823,6 @@ function WorkspaceSupportPanel({
                         <strong>Revision 1</strong>
                         <span>Initial draft snapshot.</span>
                     </div>
-                </div>
-            </div>
-        );
-    }
-
-    if (tab === 'seo') {
-        return (
-            <div className="workspace-preview-placeholder workspace-support-panel">
-                <Globe size={22} className="lucide-icon" />
-                <h3>SEO</h3>
-                <div className="seo-preview-box workspace-seo-panel">
-                    <div className="seo-title">{title} - Modern CMS</div>
-                    <div className="seo-url">http://localhost:5173/articles/{slug || 'new-article'}</div>
-                    <div className="seo-snippet">
-                        {excerpt || 'Enter article summary to preview this snippet description on Google search results...'}
-                    </div>
-                </div>
-                <div className="workspace-preview-summary">
-                    <span>{wordCount} words</span>
-                    <strong>{status}</strong>
                 </div>
             </div>
         );

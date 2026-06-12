@@ -12,5 +12,23 @@
     "search": "templates/search.html",
     "error": "templates/error.html",
     "post": "templates/post.html"
+  },
+  "regions": {
+    "sidebar": {
+      "label": "Main Sidebar",
+      "description": "Area visual di samping halaman konten."
+    },
+    "footer_1": {
+      "label": "Footer Column 1",
+      "description": "Area visual kolom pertama di bagian footer."
+    },
+    "footer_2": {
+      "label": "Footer Column 2",
+      "description": "Area visual kolom kedua di bagian footer."
+    },
+    "footer_3": {
+      "label": "Footer Column 3",
+      "description": "Area visual kolom ketiga di bagian footer."
+    }
   }
 }

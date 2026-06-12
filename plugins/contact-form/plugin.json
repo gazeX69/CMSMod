@@ -4,6 +4,88 @@
   "version": "1.0.0",
   "description": "Enables creation of customizable contact forms and lead capture.",
   "author": "Modern CMS Team",
-  "entry": "src/index.js",
-  "compatibility": "^0.1.0"
+  "compatibility": "^0.1.0",
+  "layer": "plugin",
+  "backend": {
+    "entry": "server/routes.ts",
+    "namespace": "/api/contact-form"
+  },
+  "admin": {
+    "menu": "Contact Form",
+    "route": "contact-form",
+    "bundle": "admin/plugin.tsx",
+    "permission": "contact-form.read"
+  },
+  "permissions": [
+    {
+      "key": "contact-form.read",
+      "description": "View contact forms and submissions list"
+    },
+    {
+      "key": "contact-form.create",
+      "description": "Create new contact forms"
+    },
+    {
+      "key": "contact-form.update",
+      "description": "Update contact forms"
+    },
+    {
+      "key": "contact-form.delete",
+      "description": "Delete contact forms"
+    },
+    {
+      "key": "contact-form.settings.manage",
+      "description": "Manage contact form settings"
+    },
+    {
+      "key": "contact-form.submissions.read",
+      "description": "View form submissions"
+    },
+    {
+      "key": "contact-form.submissions.delete",
+      "description": "Delete form submissions"
+    }
+  ],
+  "settings": [
+    {
+      "key": "contact-form.enable_captcha",
+      "defaultValue": "false",
+      "type": "boolean",
+      "description": "Enable captcha validation on submission",
+      "isPublic": true
+    },
+    {
+      "key": "contact-form.max_submissions_per_hour",
+      "defaultValue": "60",
+      "type": "number",
+      "description": "Limit submission rate per IP address",
+      "isPublic": false
+    },
+    {
+      "key": "contact-form.default_success_message",
+      "defaultValue": "Terima kasih, pesan Anda telah terkirim!",
+      "type": "string",
+      "description": "Default success message shown on submit",
+      "isPublic": true
+    }
+  ],
+  "events": {
+    "emits": [
+      {
+        "name": "contact-form.created",
+        "description": "Emitted when a new contact form is created"
+      },
+      {
+        "name": "contact-form.updated",
+        "description": "Emitted when a contact form is updated"
+      },
+      {
+        "name": "contact-form.submitted",
+        "description": "Emitted when a new form submission is received"
+      }
+    ]
+  },
+  "migrations": {
+    "directory": "migrations"
+  }
 }

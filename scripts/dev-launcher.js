@@ -80,6 +80,80 @@ function commandExists(command, args = ['--version']) {
   return resolvedResult.status === 0 ? resolved : null;
 }
 
+function detectPort(appName, defaultPort) {
+  try {
+    const configPath = path.join(rootDir, 'apps', appName, 'vite.config.ts');
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf8');
+      const match = content.match(/port\s*:\s*(\d+)/);
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+    }
+  } catch (error) {
+    // Ignore error and try package.json
+  }
+
+  try {
+    const pkgPath = path.join(rootDir, 'apps', appName, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      const content = fs.readFileSync(pkgPath, 'utf8');
+      const pkg = JSON.parse(content);
+      if (pkg.scripts && pkg.scripts.dev) {
+        const match = pkg.scripts.dev.match(/--port\s+(\d+)/);
+        if (match) {
+          return parseInt(match[1], 10);
+        }
+      }
+    }
+  } catch (error) {
+    // Ignore error
+  }
+
+  return defaultPort;
+}
+
+function syncDependencies() {
+  const rootNodeModules = path.join(rootDir, 'node_modules');
+  if (!fs.existsSync(rootNodeModules)) {
+    line('STARTING', 'Installing dependencies (pnpm install)...');
+    const command = isWindows ? 'cmd.exe' : pnpmCommand;
+    const args = isWindows ? ['/d', '/s', '/c', pnpmCommand, 'install'] : ['install'];
+    const result = spawnSync(command, args, { cwd: rootDir, stdio: 'inherit' });
+    if (result.status !== 0) {
+      fail('Dependency sync failed.');
+      process.exit(1);
+    }
+    line('OK', 'Dependencies synced');
+  }
+}
+
+function syncDatabase() {
+  line('STARTING', 'Running database migrations...');
+  const command = isWindows ? 'cmd.exe' : pnpmCommand;
+  const migrateArgs = isWindows 
+    ? ['/d', '/s', '/c', pnpmCommand, '--filter', '@modern-cms/api', 'db:migrate']
+    : ['--filter', '@modern-cms/api', 'db:migrate'];
+  
+  const migrateResult = spawnSync(command, migrateArgs, { cwd: rootDir, stdio: 'inherit' });
+  if (migrateResult.status !== 0) {
+    fail('Database migrations failed.');
+    process.exit(1);
+  }
+  line('OK', 'Database migrated');
+
+  line('STARTING', 'Running database seeding...');
+  const seedArgs = isWindows
+    ? ['/d', '/s', '/c', pnpmCommand, '--filter', '@modern-cms/api', 'db:seed']
+    : ['--filter', '@modern-cms/api', 'db:seed'];
+  const seedResult = spawnSync(command, seedArgs, { cwd: rootDir, stdio: 'inherit' });
+  if (seedResult.status !== 0) {
+    fail('Database seeding failed.');
+    process.exit(1);
+  }
+  line('OK', 'Database seeded and synchronized');
+}
+
 function parseEnvFile(filePath) {
   const values = {};
   const raw = fs.readFileSync(filePath, 'utf8');
@@ -257,6 +331,9 @@ async function main() {
   pnpmCommand = detectedPnpm;
   line('OK', 'PNPM detected');
 
+  // 1. Sync Dependencies
+  syncDependencies();
+
   if (!fs.existsSync(envPath)) {
     fail('.env missing.', 'Create it from .env.example before starting services.');
     return;
@@ -272,12 +349,17 @@ async function main() {
   }
   line('OK', 'Database config found');
 
+  // 2. Sync Database
+  syncDatabase();
+
   const apiHost = envValues.HOST || '127.0.0.1';
   const apiPort = normalizePort(envValues.PORT, 4000);
   const adminHost = 'localhost';
-  const adminPort = 5173;
+  const adminPort = detectPort('admin', 5173);
+  const publicPort = detectPort('public', 5174);
   const apiHealthUrl = `http://${apiHost}:${apiPort}/health`;
   const adminUrl = `http://${adminHost}:${adminPort}`;
+  const publicUrl = `http://localhost:${publicPort}`;
 
   const apiAlreadyRunning = await isPortOpen(apiHost, apiPort);
   if (apiAlreadyRunning) {
@@ -293,11 +375,20 @@ async function main() {
     spawnService('ADMIN', ['--filter', '@modern-cms/admin', 'dev']);
   }
 
+  const publicAlreadyRunning = await isPortOpen('127.0.0.1', publicPort) || await isPortOpen('localhost', publicPort);
+  if (publicAlreadyRunning) {
+    line('OK', 'PUBLIC website already running', publicUrl);
+  } else {
+    spawnService('PUBLIC', ['--filter', '@modern-cms/public', 'dev']);
+  }
+
   try {
     await waitForHttp(apiHealthUrl, 30000);
     line('OK', 'API ready', apiHealthUrl);
     await waitForHttp(adminUrl, 30000);
     line('OK', 'ADMIN ready', adminUrl);
+    await waitForHttp(publicUrl, 30000);
+    line('OK', 'PUBLIC ready', publicUrl);
   } catch (error) {
     fail('Startup check failed.', error.message);
     shutdown(1);
@@ -305,6 +396,7 @@ async function main() {
   }
 
   openBrowser(adminUrl);
+  openBrowser(publicUrl);
   line('READY', 'ModernCMS running');
   console.log(color('\nPress Ctrl+C to stop services.\n', colors.yellow));
 }

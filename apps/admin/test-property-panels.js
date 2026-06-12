@@ -9,7 +9,7 @@ const contracts = read('src/editor/contracts/index.ts');
 const registry = read('src/editor/registry/editorRegistry.ts');
 const runtime = read('src/editor/core/EditorRuntime.ts');
 const provider = read('src/editor/provider/EditorProvider.tsx');
-const articleManager = read('src/pages/ArticleManager.tsx');
+const articleManager = read('src/pages/ContentManager.tsx');
 const propertyPanelIndex = read('src/editor/property-panels/index.ts');
 const resolver = read('src/editor/property-panels/PropertyPanelResolver.ts');
 const manager = read('src/editor/property-panels/PropertyPanelManager.ts');
@@ -36,11 +36,11 @@ const checks = [
     'Editor runtime must expose inspector sections.',
   ],
   [
-    inspector.includes('data-inspector-mode="document"') &&
-      inspector.includes('data-inspector-mode="block"') &&
+    inspector.includes("id: 'document', label: 'Document'") &&
+      inspector.includes("id: 'inspector', label: 'Inspector'") &&
       inspector.includes('runtime.getInspectorSectionsByMode') &&
       inspector.includes('<PropertyPanelHost />'),
-    'InspectorHost must switch between document mode and selected block property panels.',
+    'InspectorHost must keep document and selected block property panels available as tabs.',
   ],
   [
     contracts.includes('export interface EditorPropertyPanelDefinition') &&

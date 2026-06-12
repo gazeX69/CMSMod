@@ -1,0 +1,48 @@
+{
+  "id": "seo-suite",
+  "name": "SEO Suite",
+  "version": "1.0.0",
+  "description": "Complete search appearance, content analysis, structured data, sitemap, robots, and redirect management for ModernCMS.",
+  "author": "Modern CMS Team",
+  "compatibility": "^0.1.0",
+  "layer": "plugin",
+  "backend": {
+    "entry": "server/routes.ts",
+    "namespace": "/api/seo"
+  },
+  "admin": {
+    "menu": "SEO Suite",
+    "route": "seo",
+    "bundle": "admin/plugin.ts",
+    "permission": "seo.read"
+  },
+  "permissions": [
+    { "key": "seo.read", "description": "View SEO settings and reports" },
+    { "key": "seo.edit", "description": "Edit content SEO metadata" },
+    { "key": "seo.manage", "description": "Manage global SEO settings and redirects" }
+  ],
+  "settings": [
+    { "key": "seo.title_template", "defaultValue": "%title% %sep% %site%", "type": "string", "description": "Default content title template", "isPublic": false },
+    { "key": "seo.title_separator", "defaultValue": "-", "type": "string", "description": "Title template separator", "isPublic": false },
+    { "key": "seo.default_description", "defaultValue": "", "type": "string", "description": "Fallback meta description", "isPublic": false },
+    { "key": "seo.default_robots", "defaultValue": "index,follow", "type": "string", "description": "Default robots directive", "isPublic": false },
+    { "key": "seo.sitemap_enabled", "defaultValue": "true", "type": "boolean", "description": "Enable XML sitemap", "isPublic": true },
+    { "key": "seo.robots_enabled", "defaultValue": "true", "type": "boolean", "description": "Enable managed robots.txt", "isPublic": true },
+    { "key": "seo.organization_type", "defaultValue": "Organization", "type": "string", "description": "Knowledge graph organization type", "isPublic": false },
+    { "key": "seo.organization_name", "defaultValue": "", "type": "string", "description": "Knowledge graph organization name", "isPublic": false },
+    { "key": "seo.organization_logo", "defaultValue": "", "type": "string", "description": "Knowledge graph logo URL", "isPublic": false },
+    { "key": "seo.social_profiles", "defaultValue": "[]", "type": "json", "description": "Organization social profile URLs", "isPublic": false }
+  ],
+  "events": {
+    "emits": [
+      { "name": "seo.metadata.updated", "description": "Emitted after content SEO metadata changes" },
+      { "name": "seo.redirect.hit", "description": "Emitted when a managed redirect is matched" }
+    ],
+    "listens": [
+      { "name": "content.updated", "description": "Invalidates generated sitemap data" },
+      { "name": "content.published", "description": "Invalidates generated sitemap data" },
+      { "name": "content.deleted", "description": "Invalidates generated sitemap data" }
+    ]
+  },
+  "migrations": { "directory": "migrations" }
+}

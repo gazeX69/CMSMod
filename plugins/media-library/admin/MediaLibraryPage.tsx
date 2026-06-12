@@ -44,7 +44,7 @@ export default function MediaLibraryPage({ apiFetch }: MediaLibraryPageProps) {
 
   const loadSettings = async () => {
     try {
-      const res = await apiFetch('/api/admin/media/settings');
+      const res = await apiFetch('/api/media/admin/settings');
       if (res.ok) {
         const data = await res.json();
         setAllowedGroups(data.allowed_groups || ['images', 'documents']);
@@ -96,7 +96,7 @@ export default function MediaLibraryPage({ apiFetch }: MediaLibraryPageProps) {
     }
 
     try {
-      const res = await apiFetch('/api/admin/media/settings', {
+      const res = await apiFetch('/api/media/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -131,7 +131,7 @@ export default function MediaLibraryPage({ apiFetch }: MediaLibraryPageProps) {
     setSuccessMsg(null);
 
     try {
-      const res = await apiFetch(`/api/admin/media/${selectedFile.id}`, {
+      const res = await apiFetch(`/api/media/admin/${selectedFile.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -167,7 +167,7 @@ export default function MediaLibraryPage({ apiFetch }: MediaLibraryPageProps) {
     setSuccessMsg(null);
 
     try {
-      const res = await apiFetch(`/api/admin/media/${id}`, {
+      const res = await apiFetch(`/api/media/admin/${id}`, {
         method: 'DELETE'
       });
 
@@ -188,7 +188,7 @@ export default function MediaLibraryPage({ apiFetch }: MediaLibraryPageProps) {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await apiFetch(`/api/admin/media/restore/${id}`, { method: 'PUT' });
+      const res = await apiFetch(`/api/media/admin/restore/${id}`, { method: 'PUT' });
       if (res.ok) {
         setSuccessMsg('File successfully restored from trash.');
         setSelectedFile(null);
@@ -207,7 +207,7 @@ export default function MediaLibraryPage({ apiFetch }: MediaLibraryPageProps) {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await apiFetch(`/api/admin/media/force/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/media/admin/force/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setSuccessMsg('File PERMANENTLY deleted.');
         setSelectedFile(null);

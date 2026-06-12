@@ -81,9 +81,15 @@ importers:
       '@fastify/static':
         specifier: ^7.0.4
         version: 7.0.4
+      '@modern-cms/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
       '@modern-cms/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      adm-zip:
+        specifier: ^0.5.17
+        version: 0.5.17
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
@@ -96,16 +102,37 @@ importers:
       fastify:
         specifier: ^4.26.2
         version: 4.29.1
+      ffmpeg-static:
+        specifier: ^5.3.0
+        version: 5.3.0
+      fluent-ffmpeg:
+        specifier: ^2.1.3
+        version: 2.1.3
       mysql2:
         specifier: ^3.9.7
         version: 3.22.4(@types/node@20.19.41)
+      semver:
+        specifier: ^7.8.4
+        version: 7.8.4
+      sharp:
+        specifier: ^0.34.5
+        version: 0.34.5
     devDependencies:
+      '@types/adm-zip':
+        specifier: ^0.5.8
+        version: 0.5.8
       '@types/bcryptjs':
         specifier: ^2.4.6
         version: 2.4.6
+      '@types/fluent-ffmpeg':
+        specifier: ^2.1.28
+        version: 2.1.28
       '@types/node':
         specifier: ^20.12.12
         version: 20.19.41
+      '@types/semver':
+        specifier: ^7.7.1
+        version: 7.7.1
       drizzle-kit:
         specifier: ^0.21.4
         version: 0.21.4
@@ -144,6 +171,12 @@ importers:
         specifier: workspace:*
         version: link:../shared
 
+  packages/marketplace-sdk:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+
   packages/plugin-sdk:
     devDependencies:
       '@types/react':
@@ -163,6 +196,62 @@ importers:
         version: link:../shared
 
   packages/shared: {}
+
+  plugins/comments:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.30.10
+        version: 0.30.10(@types/react@18.3.29)(mysql2@3.22.4(@types/node@20.19.41))(react@18.3.1)
+    devDependencies:
+      '@modern-cms/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
+      '@types/node':
+        specifier: ^20.12.12
+        version: 20.19.41
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.29
+      fastify:
+        specifier: ^4.26.2
+        version: 4.29.1
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.16.0(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+
+  plugins/contact-form:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.30.10
+        version: 0.30.10(@types/react@18.3.29)(mysql2@3.22.4(@types/node@20.19.41))(react@18.3.1)
+    devDependencies:
+      '@modern-cms/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
+      '@types/node':
+        specifier: ^20.12.12
+        version: 20.19.41
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.29
+      fastify:
+        specifier: ^4.26.2
+        version: 4.29.1
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.16.0(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
 
   plugins/media-library:
     dependencies:
@@ -185,6 +274,9 @@ importers:
       '@modern-cms/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
+      '@tiptap/react':
+        specifier: ^3.23.6
+        version: 3.23.6(@floating-ui/dom@1.7.6)(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))(@tiptap/pm@3.23.6)(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/fluent-ffmpeg':
         specifier: ^2.1.28
         version: 2.1.28
@@ -203,6 +295,40 @@ importers:
       react:
         specifier: ^18.3.1
         version: 18.3.1
+      tsx:
+        specifier: ^4.7.1
+        version: 4.22.3
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+
+  plugins/seo-suite:
+    dependencies:
+      '@modern-cms/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
+      drizzle-orm:
+        specifier: ^0.30.10
+        version: 0.30.10(@types/react@18.3.29)(mysql2@3.22.4(@types/node@20.19.41))(react@18.3.1)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.12.12
+        version: 20.19.41
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.29
+      fastify:
+        specifier: ^4.26.2
+        version: 4.29.1
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.16.0(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      tsx:
+        specifier: ^4.7.1
+        version: 4.22.3
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
@@ -1404,6 +1530,9 @@ packages:
   '@tiptap/starter-kit@3.23.6':
     resolution: {integrity: sha512-gykwtGWrnWCmtql1hid3opac/KV8zQvOAnu3bTqIqcHrn1FusbUwKmNzavSbfGvcktHM3hFjb35W48JyVLyu/A==}
 
+  '@types/adm-zip@0.5.8':
+    resolution: {integrity: sha512-RVVH7QvZYbN+ihqZ4kX/dMiowf6o+Jk1fNwiSdx0NahBJLU787zkULhGhJM8mf/obmLGmgdMM0bXsQTmyfbR7Q==}
+
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
 
@@ -1442,6 +1571,9 @@ packages:
   '@types/react@18.3.29':
     resolution: {integrity: sha512-ch0qJdr2JY0r04NXSprbK6TXOgnaJ1Tz23fm5W+z0/CBah6BSBc3n96h7K9GOtwh0HrilNWHIBzE1Ko4Dcw/Wg==}
 
+  '@types/semver@7.7.1':
+    resolution: {integrity: sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA==}
+
   '@types/use-sync-external-store@0.0.6':
     resolution: {integrity: sha512-zFDAD+tlpf2r4asuHEj0XH6pY6i0g5NeAHPn+15wk3BV6JA69eERFXC1gyGThDkVa1zCyKr5jox1+2LbV/AMLg==}
 
@@ -1453,6 +1585,10 @@ packages:
 
   abstract-logging@2.0.1:
     resolution: {integrity: sha512-2BjRTZxTPvheOvGbBslFSYOUkr+SjPtOnrLP33f+VIWLzezQpZcqVg7ja3L4dBXmzzgwT+a029jRx5PCi3JuiA==}
+
+  adm-zip@0.5.17:
+    resolution: {integrity: sha512-+Ut8d9LLqwEvHHJl1+PIHqoyDxFgVN847JTVM3Izi3xHDWPE4UtzzXysMZQs64DMcrJfBeS/uoEP4AD3HQHnQQ==}
+    engines: {node: '>=12.0'}
 
   agent-base@6.0.2:
     resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
@@ -2193,6 +2329,11 @@ packages:
 
   semver@7.8.1:
     resolution: {integrity: sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg==}
+    engines: {node: '>=10'}
+    hasBin: true
+
+  semver@7.8.4:
+    resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -3263,6 +3404,10 @@ snapshots:
       '@tiptap/extensions': 3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))(@tiptap/pm@3.23.6)
       '@tiptap/pm': 3.23.6
 
+  '@types/adm-zip@0.5.8':
+    dependencies:
+      '@types/node': 20.19.41
+
   '@types/babel__core@7.20.5':
     dependencies:
       '@babel/parser': 7.29.7
@@ -3309,6 +3454,8 @@ snapshots:
       '@types/prop-types': 15.7.15
       csstype: 3.2.3
 
+  '@types/semver@7.7.1': {}
+
   '@types/use-sync-external-store@0.0.6': {}
 
   '@vitejs/plugin-react@4.7.0(vite@5.4.21(@types/node@20.19.41))':
@@ -3324,6 +3471,8 @@ snapshots:
       - supports-color
 
   abstract-logging@2.0.1: {}
+
+  adm-zip@0.5.17: {}
 
   agent-base@6.0.2:
     dependencies:
@@ -4135,6 +4284,8 @@ snapshots:
   semver@6.3.1: {}
 
   semver@7.8.1: {}
+
+  semver@7.8.4: {}
 
   set-cookie-parser@2.7.2: {}
 

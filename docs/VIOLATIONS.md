@@ -1,5 +1,7 @@
 # Architectural Violations Register
 
+> Historical audit baseline. The platform-readiness remediation completed on 2026-06-12. Current disposition and automated evidence are recorded in `PLATFORM_READINESS_REPORT.md`; entries below are retained as audit history.
+
 This document tracks all architectural violations and deviations discovered during the codebase audit.
 
 ---

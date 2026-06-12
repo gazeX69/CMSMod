@@ -205,3 +205,8 @@ test-results/
 *.pid
 *.seed
 *.pid.lock
+
+# Validation screenshots
+*-validation.png
+*-validation.jpg
+*-validation.jpeg

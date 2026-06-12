@@ -6,6 +6,9 @@ import { EditorRegistryProvider, useEditorRegistry } from './EditorRegistryProvi
 import { EditorRuntime } from '../core/EditorRuntime';
 import { MediaNode } from '../nodes/MediaNode';
 import { ExternalImageNode, isAllowedExternalImageUrl } from '../nodes/ExternalImageNode';
+import { OpaquePluginBlock } from '../nodes/OpaquePluginBlock';
+import { ActiveBlockExtension } from '../extensions/ActiveBlock';
+import { DragDropExtension } from '../extensions/DragDrop';
 import { UrlInsertForm } from '../modals';
 import { editorRegistry } from '../registry/editorRegistry';
 import { ExternalImagePropertyPanel, MediaImagePropertyPanel } from '../property-panels';
@@ -233,6 +236,21 @@ editorRegistry.nodes.register({
   extension: ExternalImageNode
 });
 
+editorRegistry.nodes.register({
+  name: 'opaquePluginBlock',
+  extension: OpaquePluginBlock
+});
+
+editorRegistry.nodes.register({
+  name: 'activeBlock',
+  extension: ActiveBlockExtension
+});
+
+editorRegistry.nodes.register({
+  name: 'dragDrop',
+  extension: DragDropExtension
+});
+
 editorRegistry.propertyPanels.register({
   nodeType: 'mediaNode',
   component: MediaImagePropertyPanel
@@ -440,7 +458,7 @@ editorRegistry.toolbar.register({
   groupLabel: 'Media',
   groupOrder: 30,
   order: 10,
-  label: 'Insert Image',
+  label: 'Insert Media',
   icon: 'image',
   action: ({ requestDialog }) => requestDialog?.('image')
 });

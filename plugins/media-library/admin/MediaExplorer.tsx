@@ -49,6 +49,8 @@ export interface MediaExplorerProps {
   showSort?: boolean;
   showViewMode?: boolean;
   forcedViewMode?: 'grid' | 'list';
+  initialMimeFilter?: string;
+  acceptedMimeTypes?: string[];
 }
 
 export default function MediaExplorer({
@@ -60,14 +62,16 @@ export default function MediaExplorer({
   showTrash = true,
   showSort = true,
   showViewMode = true,
-  forcedViewMode = 'grid'
+  forcedViewMode = 'grid',
+  initialMimeFilter = '',
+  acceptedMimeTypes
 }: MediaExplorerProps) {
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
   const [limit] = useState<number>(20);
   const [search, setSearch] = useState<string>('');
-  const [mimeFilter, setMimeFilter] = useState<string>('');
+  const [mimeFilter, setMimeFilter] = useState<string>(initialMimeFilter);
   const [sort, setSort] = useState<string>('createdAt_DESC');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(forcedViewMode);
   const [isTrashMode, setIsTrashMode] = useState<boolean>(false);
@@ -85,7 +89,7 @@ export default function MediaExplorer({
     setErrorMsg(null);
     try {
       if (isTrashMode && showTrash) {
-        const res = await apiFetch(`/api/admin/media/trash`);
+        const res = await apiFetch(`/api/media/admin/trash`);
         if (res.ok) {
           const data = await res.json();
           setFiles(data.items || []);
@@ -102,7 +106,7 @@ export default function MediaExplorer({
           mimeType: mimeFilter,
           sort
         });
-        const res = await apiFetch(`/api/admin/media?${query.toString()}`);
+        const res = await apiFetch(`/api/media/admin?${query.toString()}`);
         if (res.ok) {
           const data = await res.json();
           setFiles(data.items || []);
@@ -138,7 +142,7 @@ export default function MediaExplorer({
 
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4000';
-      const res = await fetch(`${apiUrl}/api/admin/media/upload`, {
+      const res = await fetch(`${apiUrl}/api/media/admin/upload`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -188,6 +192,7 @@ export default function MediaExplorer({
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <input 
             type="file" 
+            accept={acceptedMimeTypes?.join(',')}
             ref={fileInputRef} 
             onChange={handleUpload} 
             style={{ display: 'none' }}

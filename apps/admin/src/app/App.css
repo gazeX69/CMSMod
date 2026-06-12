@@ -1363,6 +1363,241 @@ body {
   top: 2rem;
 }
 
+/* ========================================================================== 
+   RESPONSIVE ADMIN SURFACES
+   ========================================================================== */
+@media (max-width: 900px) {
+  .view-header,
+  .view-header-with-action {
+    margin-bottom: 1.25rem;
+  }
+
+  .view-header-with-action {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .view-header-with-action > .btn-primary-action,
+  .view-header-with-action > button {
+    width: 100%;
+  }
+
+  .metrics-grid,
+  .widgets-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .metrics-grid,
+  .widgets-grid,
+  .metric-card,
+  .widget-card,
+  .card {
+    min-width: 0;
+  }
+
+  .widget-card .table-container {
+    max-width: 100%;
+  }
+
+  .widget-card.span-2 {
+    grid-column: 1 / -1;
+  }
+
+  .table-filter-bar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .filter-left {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .filter-left > *,
+  .filter-select,
+  .search-filter-input {
+    min-width: 0;
+    flex: 1 1 180px;
+  }
+
+  .table-container {
+    margin-right: -0.25rem;
+    padding-bottom: 0.35rem;
+    overscroll-behavior-inline: contain;
+  }
+
+  .admin-table {
+    min-width: 720px;
+  }
+
+  .settings-container {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .settings-tabs {
+    width: 100%;
+    overflow-x: auto;
+    flex-direction: row;
+    padding-bottom: 0.25rem;
+  }
+
+  .settings-tabs .tab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .settings-tab-panel {
+    min-width: 0;
+    padding: 1.25rem;
+  }
+
+  .settings-form {
+    max-width: none;
+  }
+
+  .taxonomy-grid-layout {
+    gap: 1rem;
+  }
+
+  .tax-form-col {
+    position: static;
+  }
+
+  .theme-banner-card {
+    flex-direction: column;
+  }
+
+  .theme-preview-mock {
+    width: 100%;
+    min-height: 150px;
+  }
+
+  .theme-meta-details {
+    padding: 1.25rem;
+  }
+
+  .theme-metadata-row,
+  .theme-card-actions,
+  .actions-row-settings {
+    flex-wrap: wrap;
+  }
+
+  .theme-settings-layout {
+    grid-template-columns: 1fr !important;
+    min-height: 0 !important;
+  }
+
+  .theme-settings-navigation,
+  .theme-settings-content {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .theme-settings-navigation {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .view-header h2,
+  .view-header-with-action h2 {
+    font-size: 1.45rem;
+  }
+
+  .view-header p,
+  .view-header-with-action p {
+    font-size: 0.85rem;
+  }
+
+  .metrics-grid,
+  .widgets-grid,
+  .available-themes-grid,
+  .media-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metric-card,
+  .widget-card {
+    padding: 1rem;
+  }
+
+  .widget-card.span-2 {
+    grid-column: auto;
+  }
+
+  .card,
+  .settings-tab-panel {
+    border-radius: 10px;
+  }
+
+  .table-filter-bar {
+    padding: 0.75rem;
+  }
+
+  .admin-table {
+    min-width: 640px;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 0.7rem 0.75rem;
+  }
+
+  .table-actions {
+    flex-wrap: wrap;
+  }
+
+  .dropzone-area,
+  .placeholder-container {
+    padding: 2rem 1rem;
+  }
+
+  .placeholder-container {
+    margin: 1.5rem auto;
+  }
+
+  .theme-meta-details h4,
+  .theme-metadata-row,
+  .theme-settings-toolbar,
+  .theme-settings-title,
+  .theme-settings-actions {
+    align-items: flex-start !important;
+    flex-direction: column;
+  }
+
+  .theme-settings-title,
+  .theme-settings-actions,
+  .theme-settings-actions > button,
+  .actions-row-settings > button,
+  .btn-save-settings {
+    width: 100%;
+  }
+
+  .theme-settings-navigation {
+    display: flex !important;
+  }
+
+  .theme-settings-content {
+    padding: 1rem !important;
+  }
+
+  .seo-url,
+  .permalink-display code {
+    overflow-wrap: anywhere;
+  }
+
+  .permalink-display {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
 .tax-form {
   display: flex;
   flex-direction: column;

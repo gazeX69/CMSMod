@@ -20,6 +20,12 @@ import { publicRoutes } from './routes/public.js';
 import { loadActivePluginRuntimes } from './plugins/pluginRuntimeLoader.js';
 import { syncPluginsFromDisk } from './plugins/pluginLifecycleService.js';
 import { getPublicSettings } from './settings/settingsService.js';
+import { themesRoutes } from './routes/themes.js';
+import { navigationRoutes } from './routes/navigation.js';
+import { usersRoutes } from './routes/users.js';
+import { initializeRegistry } from './themes/themeRegistry.js';
+import { widgetsRoutes } from './routes/widgets.js';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,7 +52,7 @@ export function buildApp(): FastifyInstance {
       'http://localhost:5186',
       'http://127.0.0.1:5186',
     ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
 
@@ -56,6 +62,10 @@ export function buildApp(): FastifyInstance {
   app.register(postsRoutes, { prefix: '/api' });
   app.register(taxonomyRoutes, { prefix: '/api' });
   app.register(settingsRoutes, { prefix: '/api' });
+  app.register(themesRoutes, { prefix: '/api' });
+  app.register(navigationRoutes, { prefix: '/api' });
+  app.register(usersRoutes, { prefix: '/api' });
+  app.register(widgetsRoutes, { prefix: '/api' });
   app.register(publicRoutes, { prefix: '/api' });
 
   // Register plugins and static files asynchronously
@@ -91,6 +101,14 @@ export function buildApp(): FastifyInstance {
       await loadActivePluginRuntimes(pluginApp);
     } catch (err: any) {
       pluginApp.log.error(err, 'Failed to load dynamic plugins');
+    }
+
+    // 5. Initialize theme registry
+    try {
+      await initializeRegistry();
+      pluginApp.log.info('Theme registry initialized');
+    } catch (err: any) {
+      pluginApp.log.error(err, 'Failed to initialize theme registry');
     }
   });
 

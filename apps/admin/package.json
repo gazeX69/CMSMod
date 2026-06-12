@@ -7,9 +7,12 @@
     "dev": "vite --port 5173",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test:editor": "node test-editor.js && node test-editor-image-regression.js && node test-property-panels.js",
+    "test:editor": "node test-editor.js && node test-editor-image-regression.js && node test-property-panels.js && node test-featured-image.js && node test-universal-media.js && node test-plugin-lifecycle.js",
     "test:editor:browser": "node test-editor-image-browser.js",
-    "test:editor:property-browser": "node test-image-property-panel-browser.js"
+    "test:editor:block-drag-browser": "node test-block-drag-browser.js",
+    "test:editor:property-browser": "node test-image-property-panel-browser.js",
+    "test:responsive:browser": "node test-responsive-admin-browser.js",
+    "test:publish:browser": "node test-publish-flow-browser.js"
   },
   "dependencies": {
     "@modern-cms/plugin-sdk": "workspace:*",

@@ -16,10 +16,12 @@ export interface EditorInsertResult {
   caption?: string;
   mimeType?: string;
   url?: string;
+  editorNode?: { type: string; attrs?: Record<string, any> };
 }
 
 export interface EditorInsertSourceRenderProps {
   apiFetch: (path: string, options?: RequestInit) => Promise<Response>;
+  options?: { mimeTypes?: string[]; multiple?: boolean };
   onSelect: (result: EditorInsertResult | null) => void;
   onCancel: () => void;
 }
@@ -132,10 +134,12 @@ export interface EditorRegistry {
     register: (command: EditorCommand) => void;
     execute: (editor: Editor, name: string, ...args: any[]) => any;
     getAll: () => EditorCommand[];
+    unregister?: (name: string) => void;
   };
   nodes: {
     register: (node: EditorNodeDefinition) => void;
     getAll: () => EditorNodeDefinition[];
+    unregister?: (name: string) => void;
   };
   marks: {
     register: (mark: EditorMarkDefinition) => void;
@@ -150,16 +154,19 @@ export interface EditorRegistry {
     register: (panel: EditorPropertyPanelDefinition) => void;
     getAll: () => EditorPropertyPanelDefinition[];
     getByNodeType: (nodeType: string) => EditorPropertyPanelDefinition | undefined;
+    unregister?: (nodeType: string) => void;
   };
   inspectorSections: {
     register: (section: EditorInspectorSectionDefinition) => void;
     getAll: () => EditorInspectorSectionDefinition[];
     getByMode: (mode: EditorInspectorMode) => EditorInspectorSectionDefinition[];
+    unregister?: (id: string) => void;
   };
   sidebars: {
     register: (sidebar: EditorSidebarDefinition) => void;
     getAll: () => EditorSidebarDefinition[];
     getById: (id: string) => EditorSidebarDefinition | undefined;
+    unregister?: (id: string) => void;
   };
   mediaPicker: {
     register: (handler: EditorMediaPickerHandler) => void;
@@ -168,5 +175,6 @@ export interface EditorRegistry {
   insertSources: {
     register: (source: EditorInsertSource) => void;
     getAll: () => EditorInsertSource[];
+    unregister?: (id: string) => void;
   };
 }

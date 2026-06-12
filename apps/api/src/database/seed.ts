@@ -9,6 +9,7 @@ import {
   assignAllPermissionsToRole,
   registerCorePermissions,
 } from '../permissions/permissionService.js';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -125,9 +126,12 @@ async function seed() {
     }
 
     // 2b. Seed Public Website starter content and navigation.
+    let homePageUuid: string;
     const existingHome = await db.select().from(contents).where(eq(contents.slug, 'home')).limit(1);
     if (existingHome.length === 0) {
+      homePageUuid = crypto.randomUUID();
       await db.insert(contents).values({
+        uuid: homePageUuid,
         title: 'Home',
         slug: 'home',
         type: 'page',
@@ -139,10 +143,88 @@ async function seed() {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      console.log("Published starter content 'home' created.");
+      console.log(`Published starter content 'home' created with UUID ${homePageUuid}.`);
     } else {
+      homePageUuid = existingHome[0].uuid;
       console.log("Starter content 'home' already exists.");
     }
+
+    // Seed homepage settings based on the generated UUID
+    const existingTarget = await db.select().from(settings).where(eq(settings.key, 'site.homepage_target')).limit(1);
+    if (existingTarget.length === 0) {
+      await db.insert(settings).values({
+        key: 'site.homepage_target',
+        value: homePageUuid,
+        description: 'Active homepage content UUID',
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+      });
+      console.log(`Setting 'site.homepage_target' created with value ${homePageUuid}.`);
+    } else {
+      console.log("Setting 'site.homepage_target' already exists.");
+    }
+
+    const existingMode = await db.select().from(settings).where(eq(settings.key, 'site.homepage_mode')).limit(1);
+    if (existingMode.length === 0) {
+      await db.insert(settings).values({
+        key: 'site.homepage_mode',
+        value: 'single',
+        description: 'Homepage rendering mode (single page or collection list)',
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+      });
+      console.log("Setting 'site.homepage_mode' created.");
+    } else {
+      console.log("Setting 'site.homepage_mode' already exists.");
+    }
+
+    const existingPostsTarget = await db.select().from(settings).where(eq(settings.key, 'site.posts_page_target')).limit(1);
+    if (existingPostsTarget.length === 0) {
+      await db.insert(settings).values({
+        key: 'site.posts_page_target',
+        value: '',
+        description: 'Active posts page content UUID when homepage displays a static page',
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+      });
+      console.log("Setting 'site.posts_page_target' created.");
+    } else {
+      console.log("Setting 'site.posts_page_target' already exists.");
+    }
+
+    const existingPostsPerPage = await db.select().from(settings).where(eq(settings.key, 'site.posts_per_page')).limit(1);
+    if (existingPostsPerPage.length === 0) {
+      await db.insert(settings).values({
+        key: 'site.posts_per_page',
+        value: '10',
+        description: 'Number of posts to display per page on collection list',
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+      });
+      console.log("Setting 'site.posts_per_page' created.");
+    } else {
+      console.log("Setting 'site.posts_per_page' already exists.");
+    }
+    const existingPermalink = await db.select().from(settings).where(eq(settings.key, 'site.permalink_structure')).limit(1);
+    if (existingPermalink.length === 0) {
+      await db.insert(settings).values({
+        key: 'site.permalink_structure',
+        value: '/posts/%postname%/',
+        description: 'Permalink structure for articles/posts',
+        group: 'site',
+        type: 'string',
+        isPublic: true,
+      });
+      console.log("Setting 'site.permalink_structure' created.");
+    } else {
+      console.log("Setting 'site.permalink_structure' already exists.");
+    }
+
+
 
     const defaultNavigation = [
       { label: 'Home', url: '/', location: 'primary', sortOrder: 0 },

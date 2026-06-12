@@ -1,8 +1,8 @@
 :root {
-  color-scheme: light;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #202124;
-  background: #f7f8fb;
+  color-scheme: light dark;
+  font-family: var(--body-font, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  color: var(--text-color, #202124);
+  background: var(--bg-color, #f7f8fb);
 }
 
 * {
@@ -12,15 +12,17 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: #f7f8fb;
+  background: var(--bg-color, #f7f8fb);
+  color: var(--text-color, #202124);
 }
 
 a {
-  color: #0f6b5f;
+  color: var(--link-color, #0f6b5f);
   text-decoration: none;
 }
 
 a:hover {
+  color: var(--primary-color, var(--primary, #0f6b5f));
   text-decoration: underline;
 }
 
@@ -37,8 +39,8 @@ a:hover {
 }
 
 .site-header {
-  border-bottom: 1px solid #dde2ea;
-  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid var(--border, #dde2ea);
+  background: var(--surface-color, rgba(255, 255, 255, 0.9));
   backdrop-filter: blur(14px);
   position: sticky;
   top: 0;
@@ -51,12 +53,12 @@ a:hover {
   gap: 24px;
   justify-content: space-between;
   margin: 0 auto;
-  max-width: 1100px;
+  max-width: var(--container-width, 1100px);
   padding: 16px 20px;
 }
 
 .brand {
-  color: #1d2733;
+  color: var(--text-color, #1d2733);
   font-size: 1rem;
   font-weight: 800;
 }
@@ -70,19 +72,25 @@ a:hover {
 
 .nav-links a,
 .footer-links a {
-  color: #4b5563;
+  color: var(--text-color, #4b5563);
   font-size: 0.94rem;
   font-weight: 600;
+  transition: color 0.2s;
+}
+
+.nav-links a:hover,
+.footer-links a:hover {
+  color: var(--primary-color, var(--primary, #0f6b5f));
 }
 
 .site-main {
   margin: 0 auto;
-  max-width: 1100px;
+  max-width: var(--content-width, 1100px);
   padding: 42px 20px 64px;
 }
 
 .home-hero {
-  border-bottom: 1px solid #dde2ea;
+  border-bottom: 1px solid var(--border, #dde2ea);
   margin-bottom: 36px;
   padding: 32px 0 40px;
 }
@@ -91,7 +99,7 @@ a:hover {
 .page-content h1,
 .search-page h1,
 .cms-error h1 {
-  color: #1d2733;
+  color: var(--text-color, #1d2733);
   font-size: clamp(2rem, 5vw, 4.5rem);
   letter-spacing: 0;
   line-height: 1.02;
@@ -100,7 +108,7 @@ a:hover {
 
 .home-hero p,
 .content-excerpt {
-  color: #586273;
+  color: var(--text-muted, var(--text-color, #586273));
   font-size: 1.08rem;
   line-height: 1.7;
   margin: 0;
@@ -114,14 +122,14 @@ a:hover {
 }
 
 .page-content h2 {
-  color: #1d2733;
+  color: var(--text-color, #1d2733);
   font-size: 1.4rem;
   letter-spacing: 0;
   margin: 0 0 16px;
 }
 
 .body {
-  color: #293241;
+  color: var(--text-color, #293241);
   font-size: 1.02rem;
   line-height: 1.8;
 }
@@ -134,6 +142,27 @@ a:hover {
   max-width: 100%;
 }
 
+.body img[data-align="left"] {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+.body img[data-align="center"] {
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.body img[data-align="right"] {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+.body img[data-align="wide"] {
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+}
+
 .search-form {
   display: flex;
   gap: 10px;
@@ -142,7 +171,9 @@ a:hover {
 }
 
 .search-form input {
-  border: 1px solid #cbd3df;
+  border: 1px solid var(--border, #cbd3df);
+  background: var(--surface-color, #ffffff);
+  color: var(--text-color, inherit);
   border-radius: 8px;
   flex: 1;
   font: inherit;
@@ -151,7 +182,7 @@ a:hover {
 }
 
 .search-form button {
-  background: #0f6b5f;
+  background: var(--primary-color, var(--primary, #0f6b5f));
   border: 0;
   border-radius: 8px;
   color: white;
@@ -162,7 +193,7 @@ a:hover {
 }
 
 .search-result {
-  border-top: 1px solid #dde2ea;
+  border-top: 1px solid var(--border, #dde2ea);
   padding: 20px 0;
 }
 
@@ -173,7 +204,7 @@ a:hover {
 }
 
 .search-result p {
-  color: #586273;
+  color: var(--text-muted, #586273);
   line-height: 1.65;
   margin: 0;
 }
@@ -186,8 +217,8 @@ a:hover {
 }
 
 .site-footer {
-  border-top: 1px solid #dde2ea;
-  color: #657184;
+  border-top: 1px solid var(--border, #dde2ea);
+  color: var(--text-muted, #657184);
   margin: 0 auto;
   max-width: 1100px;
   padding: 24px 20px 36px;

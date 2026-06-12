@@ -34,10 +34,9 @@ function App() {
     url.searchParams.set('path', window.location.pathname || '/');
 
     const query = new URLSearchParams(window.location.search);
-    const searchQuery = query.get('q');
-    if (searchQuery) {
-      url.searchParams.set('q', searchQuery);
-    }
+    query.forEach((value, key) => {
+      url.searchParams.set(key, value);
+    });
 
     return url.toString();
   }, [path]);
@@ -50,8 +49,30 @@ function App() {
       const target = event.target;
       if (!(target instanceof Element)) return;
 
+      // Handle mobile menu toggle button click
+      const toggleBtn = target.closest('.mobile-menu-toggle');
+      if (toggleBtn) {
+        event.preventDefault();
+        const header = target.closest('.site-header');
+        if (header) {
+          const isOpen = header.classList.toggle('is-menu-open');
+          toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
+        return;
+      }
+
       const link = target.closest('a');
       if (!link) return;
+
+      // Close mobile menu if open when clicking a link
+      const header = document.querySelector('.site-header');
+      if (header) {
+        header.classList.remove('is-menu-open');
+        const toggle = header.querySelector('.mobile-menu-toggle');
+        if (toggle) {
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      }
 
       const href = link.getAttribute('href');
       const targetAttr = link.getAttribute('target');
@@ -104,6 +125,23 @@ function App() {
       cancelled = true;
     };
   }, [renderUrl]);
+
+  useEffect(() => {
+    if (loading || !rendered) return;
+
+    const container = document.querySelector('.theme-render-root');
+    if (!container) return;
+
+    const scripts = container.querySelectorAll('script');
+    scripts.forEach((oldScript) => {
+      const newScript = document.createElement('script');
+      Array.from(oldScript.attributes).forEach((attr) => {
+        newScript.setAttribute(attr.name, attr.value);
+      });
+      newScript.textContent = oldScript.textContent;
+      oldScript.parentNode?.replaceChild(newScript, oldScript);
+    });
+  }, [rendered, loading]);
 
   if (loading) {
     return (

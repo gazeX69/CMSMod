@@ -15,8 +15,9 @@
   "admin": {
     "menu": "Perpustakaan Media",
     "route": "media",
-    "bundle": "admin/bundle.js",
-    "css": "admin/bundle.css"
+    "bundle": "admin/plugin.ts",
+    "css": "admin/bundle.css",
+    "permission": "media.read"
   },
 
   "permissions": [
@@ -48,7 +49,7 @@
     },
     {
       "key": "media.allowed_groups",
-      "defaultValue": "images,documents",
+      "defaultValue": "images,documents,audio,video",
       "type": "string",
       "description": "Comma separated allowed media groups",
       "isPublic": true

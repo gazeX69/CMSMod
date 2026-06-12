@@ -22,3 +22,18 @@ footer {
   border-top: 1px solid #dee2e6;
   margin-top: 4rem;
 }
+.body img[data-align="left"] { margin-right: auto; margin-left: 0; }
+.body img[data-align="center"] { margin-right: auto; margin-left: auto; }
+.body img[data-align="right"] { margin-right: 0; margin-left: auto; }
+.body img[data-align="wide"] { width: 100%; margin-right: auto; margin-left: auto; }
+.post-featured-image {
+  margin: 0 0 2rem;
+}
+
+.post-featured-image img {
+  display: block;
+  width: 100%;
+  max-height: 620px;
+  border-radius: var(--radius-lg, 16px);
+  object-fit: cover;
+}

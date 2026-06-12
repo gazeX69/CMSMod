@@ -34,6 +34,10 @@ function validateManifest(raw: any): PluginManifest {
     throw new Error('plugin.backend.entry must be a string');
   }
 
+  if (raw.compatibility !== undefined && typeof raw.compatibility !== 'string') {
+    throw new Error('plugin.compatibility must be a string');
+  }
+
   if (raw.backend?.namespace && typeof raw.backend.namespace !== 'string') {
     throw new Error('plugin.backend.namespace must be a string');
   }
@@ -47,8 +51,16 @@ function validateManifest(raw: any): PluginManifest {
   }
 
   if (raw.dependencies?.some((dependency: any) => typeof dependency !== 'string')) {
-    throw new Error('plugin.dependencies must contain plugin id strings');
+    const invalid = raw.dependencies.some((dependency: any) => typeof dependency !== 'string' && (!dependency || typeof dependency.id !== 'string'));
+    if (invalid) throw new Error('plugin.dependencies must contain plugin ids or { id, version } objects');
   }
+
+  if (raw.package) {
+    if (!['plugin', 'theme', 'integration', 'sdk-extension'].includes(raw.package.type)) throw new Error('plugin.package.type is invalid');
+    if (!raw.package.publisher?.id || !raw.package.publisher?.name) throw new Error('plugin.package.publisher requires id and name');
+  }
+
+  if (raw.runtime?.entry && typeof raw.runtime.entry !== 'string') throw new Error('plugin.runtime.entry must be a string');
 
   if (raw.admin) {
     if (!raw.admin.menu || typeof raw.admin.menu !== 'string') {
@@ -136,7 +148,7 @@ export function scanPlugins(): ScannedPlugin[] {
   const scanned: ScannedPlugin[] = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
 
     const pluginPath = path.join(pluginsDir, entry.name);
     const manifestPath = path.join(pluginPath, 'plugin.json');
@@ -157,6 +169,16 @@ export function scanPlugins(): ScannedPlugin[] {
       const rawManifest = fs.readFileSync(manifestPath, 'utf-8');
       const parsed = JSON.parse(rawManifest);
       const manifest = validateManifest(parsed);
+      if (manifest.admin?.bundle) {
+        const bundlePath = path.resolve(pluginPath, manifest.admin.bundle);
+        if (bundlePath !== pluginPath && !bundlePath.startsWith(`${pluginPath}${path.sep}`)) throw new Error('plugin.admin.bundle resolves outside plugin root');
+        if (!fs.existsSync(bundlePath)) throw new Error(`plugin.admin.bundle not found: ${manifest.admin.bundle}`);
+      }
+      if (manifest.runtime?.entry) {
+        const runtimePath = path.resolve(pluginPath, manifest.runtime.entry);
+        if (runtimePath !== pluginPath && !runtimePath.startsWith(`${pluginPath}${path.sep}`)) throw new Error('plugin.runtime.entry resolves outside plugin root');
+        if (!fs.existsSync(runtimePath)) throw new Error(`plugin.runtime.entry not found: ${manifest.runtime.entry}`);
+      }
 
       scanned.push({
         key: manifest.id,

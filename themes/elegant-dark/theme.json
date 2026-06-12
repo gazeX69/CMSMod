@@ -1,0 +1,39 @@
+{
+  "id": "elegant-dark",
+  "name": "Elegant Neon Dark",
+  "version": "1.0.0",
+  "author": "Antigravity AI",
+  "description": "A premium glassmorphic dark theme with glowing neon accents for modern portals and blogs.",
+  "screenshot": "screenshot.png",
+  "templates": {
+    "layout": "templates/layout.html",
+    "home": "templates/home.html",
+    "page": "templates/page.html",
+    "content": "templates/content.html",
+    "search": "templates/search.html",
+    "error": "templates/error.html",
+    "post": "templates/post.html"
+  },
+  "regions": {
+    "hero": {
+      "label": "Hero Banner Area",
+      "description": "Area visual banner promosi besar di halaman utama."
+    },
+    "sidebar": {
+      "label": "Main Sidebar",
+      "description": "Area visual di samping halaman konten."
+    },
+    "footer_1": {
+      "label": "Footer Column 1",
+      "description": "Area visual kolom pertama di bagian footer."
+    },
+    "footer_2": {
+      "label": "Footer Column 2",
+      "description": "Area visual kolom kedua di bagian footer."
+    },
+    "footer_3": {
+      "label": "Footer Column 3",
+      "description": "Area visual kolom ketiga di bagian footer."
+    }
+  }
+}

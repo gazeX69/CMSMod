@@ -1,5 +1,7 @@
 # Current Status: ModernCMS
 
+> This subsystem inventory predates the platform-readiness program. Plugin-platform status is superseded by `PLATFORM_READINESS_REPORT.md` dated 2026-06-12.
+
 This document defines the exact development status of components and subsystems within ModernCMS.
 
 ---

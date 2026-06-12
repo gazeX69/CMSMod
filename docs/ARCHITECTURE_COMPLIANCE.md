@@ -1,5 +1,7 @@
 # Architecture Compliance Report
 
+> Historical baseline. Use `PLATFORM_READINESS_REPORT.md` for the verified post-remediation status dated 2026-06-12.
+
 This document records the verified status of the codebase against all 16 LOCKED architecture documents. Each compliance assertion is validated.
 
 ---

@@ -1,0 +1,16 @@
+<article class="post-content">
+  <header style="margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
+    <h1>{{ post.title }}</h1>
+    <div class="meta" style="color: var(--accent); font-size: 0.9rem;">Published on {{ post.date }} by {{ post.author }}</div>
+  </header>
+  {{#if post.featuredImage.url}}
+  <figure style="margin: 0 0 2rem;">
+    <img src="{{ post.featuredImage.url }}" alt="{{ post.featuredImage.alt }}" style="display:block;width:100%;max-height:620px;object-fit:cover;border-radius:16px;">
+  </figure>
+  {{/if}}
+  <div class="body">
+    {{ post.content }}
+  </div>
+
+  {{ comments }}
+</article>

@@ -5,6 +5,7 @@ import { eq, or, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { requireAuth } from '../hooks/auth.js';
+import { getUserPermissionsAndRoles } from '../permissions/permissionService.js';
 
 export async function authRoutes(app: FastifyInstance) {
   // GET /api/auth/setup-status
@@ -88,12 +89,16 @@ export async function authRoutes(app: FastifyInstance) {
         expires: expiresAt,
       });
 
+      const userAccess = await getUserPermissionsAndRoles(user.id);
+
       return {
         success: true,
         user: {
           id: user.id,
           username: user.username,
           email: user.email,
+          roles: userAccess.roles,
+          permissions: userAccess.permissions,
         },
       };
     } catch (error) {
@@ -126,6 +131,13 @@ export async function authRoutes(app: FastifyInstance) {
 
   // GET /api/auth/me (Protected)
   app.get('/auth/me', { preHandler: requireAuth }, async (request, reply) => {
-    return { user: request.user };
+    const userAccess = await getUserPermissionsAndRoles(request.user!.id);
+    return {
+      user: {
+        ...request.user,
+        roles: userAccess.roles,
+        permissions: userAccess.permissions,
+      }
+    };
   });
 }

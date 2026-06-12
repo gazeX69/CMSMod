@@ -1,0 +1,115 @@
+{
+  "id": "comments",
+  "name": "Comments",
+  "version": "1.0.0",
+  "description": "Universal polymorphic comments and discussion engine.",
+  "author": "Modern CMS Team",
+  "compatibility": "^0.1.0",
+  "layer": "plugin",
+
+  "backend": {
+    "entry": "server/routes.ts",
+    "namespace": "/api/comments"
+  },
+
+  "admin": {
+    "menu": "Komentar",
+    "route": "comments",
+    "bundle": "admin/plugin.ts",
+    "css": "admin/bundle.css",
+    "permission": "comments.read"
+  },
+
+  "permissions": [
+    {
+      "key": "comments.read",
+      "description": "View comments list and details"
+    },
+    {
+      "key": "comments.create",
+      "description": "Submit a new comment or reply"
+    },
+    {
+      "key": "comments.update",
+      "description": "Edit existing comment text"
+    },
+    {
+      "key": "comments.delete",
+      "description": "Delete comments permanently"
+    },
+    {
+      "key": "comments.moderate",
+      "description": "Approve, reject, or mark comments as spam"
+    }
+  ],
+
+  "settings": [
+    {
+      "key": "comments.enabled",
+      "defaultValue": "true",
+      "type": "boolean",
+      "description": "Enable commenting globally",
+      "isPublic": true
+    },
+    {
+      "key": "comments.allow_guest",
+      "defaultValue": "true",
+      "type": "boolean",
+      "description": "Allow non-registered guest users to post comments",
+      "isPublic": true
+    },
+    {
+      "key": "comments.require_approval",
+      "defaultValue": "false",
+      "type": "boolean",
+      "description": "Require admin moderation approval before comments are published",
+      "isPublic": true
+    },
+    {
+      "key": "comments.max_depth",
+      "defaultValue": "3",
+      "type": "number",
+      "description": "Maximum nesting depth of comment reply threads",
+      "isPublic": true
+    },
+    {
+      "key": "comments.default_enabled_page",
+      "defaultValue": "false",
+      "type": "boolean",
+      "description": "Enable comments on pages by default",
+      "isPublic": true
+    },
+    {
+      "key": "comments.default_enabled_article",
+      "defaultValue": "true",
+      "type": "boolean",
+      "description": "Enable comments on articles by default",
+      "isPublic": true
+    }
+  ],
+
+  "events": {
+    "emits": [
+      {
+        "name": "comment.created",
+        "description": "Emitted when a comment or reply is posted"
+      },
+      {
+        "name": "comment.updated",
+        "description": "Emitted when a comment is updated"
+      },
+      {
+        "name": "comment.approved",
+        "description": "Emitted when a comment is approved by moderators"
+      },
+      {
+        "name": "comment.deleted",
+        "description": "Emitted when a comment is permanently deleted"
+      }
+    ]
+  },
+
+  "migrations": {
+    "directory": "migrations"
+  }
+}

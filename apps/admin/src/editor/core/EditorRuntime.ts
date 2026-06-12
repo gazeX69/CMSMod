@@ -53,6 +53,10 @@ export class EditorRuntime {
     return this.registry.inspectorSections.getByMode(mode);
   }
 
+  public getSidebars() {
+    return this.registry.sidebars.getAll();
+  }
+
   // -- Media Picker Runtime --
   public registerMediaPicker(handler: EditorMediaPickerHandler): void {
     this.registry.mediaPicker.register(handler);

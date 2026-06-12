@@ -1,47 +1,36 @@
 import React from 'react';
-import { editorRegistry } from '../../../apps/admin/src/editor/registry/editorRegistry';
+import type { AdminRuntimeSdk } from '@modern-cms/plugin-sdk';
 import MediaPicker from '../admin/MediaPicker';
-import { EditorInsertSourceRenderProps } from '../../../apps/admin/src/editor/contracts';
+import { UNIVERSAL_MEDIA_NODE, UniversalMediaNode, UniversalMediaPropertyPanel } from './UniversalMediaNode';
 
-// 1. Register the Media Picker Handler
-editorRegistry.mediaPicker.register(async () => {
-  return {
-    uuid: '00000000-0000-0000-0000-000000000001',
-    alt: 'Media Library Demo',
-    caption: 'Plugin Bridge Test'
-  };
-});
-
-// 2. Register as a dynamic Insert Source
-editorRegistry.insertSources.register({
-  id: 'media-library',
-  pluginId: 'media-library',
-  label: 'Media Library',
-  icon: 'image',
-  preferredWidth: 900,
-  render: (props: EditorInsertSourceRenderProps) => {
-    return React.createElement(MediaPicker, {
+export function registerEditorIntegration(sdk: AdminRuntimeSdk) {
+  sdk.editor.node.register({ name: UNIVERSAL_MEDIA_NODE, extension: UniversalMediaNode });
+  sdk.editor.propertyPanel.register({ nodeType: UNIVERSAL_MEDIA_NODE, component: UniversalMediaPropertyPanel });
+  sdk.editor.command.register({
+    name: 'media-library:insert',
+    action: (editor: any, attrs: Record<string, unknown>) => editor.chain().focus().insertContent([
+      { type: UNIVERSAL_MEDIA_NODE, attrs },
+      { type: 'paragraph' },
+    ]).run(),
+  });
+  sdk.capabilities.registerProvider('media.picker', {
+    render: (props: any) => React.createElement(MediaPicker, {
       apiFetch: props.apiFetch,
+      options: props.options,
       onSelect: props.onSelect,
-      onCancel: props.onCancel
-    });
-  },
-  pick: async () => {
-    const picker = editorRegistry.mediaPicker.get();
-    if (!picker) return null;
-
-    try {
-      const result = await picker();
-      if (result) {
-        return {
-          uuid: result.uuid,
-          alt: result.alt || '',
-          caption: result.caption || ''
-        };
-      }
-    } catch (err) {
-      // Fail-safe ignore
-    }
-    return null;
-  }
-});
+      onCancel: props.onCancel,
+    }),
+  });
+  sdk.editor.insertSource.register({
+    id: 'media-library',
+    label: 'Media Library',
+    icon: 'image',
+    preferredWidth: 900,
+    render: (props: any) => React.createElement(MediaPicker, {
+      apiFetch: props.apiFetch,
+      options: props.options,
+      onSelect: props.onSelect,
+      onCancel: props.onCancel,
+    }),
+  });
+}

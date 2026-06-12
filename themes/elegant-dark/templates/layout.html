@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ seo.title }}</title>
+    <meta name="description" content="{{ seo.description }}" />
+    {{#if seo.image}}<meta property="og:image" content="{{ seo.image }}" />{{/if}}
+    <link rel="canonical" href="{{ seo.canonicalUrl }}" />
+    <style>
+      :root {
+        --bg: {{ theme.settings.colors.background }};
+        --card-bg: rgba(24, 24, 27, {{ theme.settings.glowEffects.glassOpacity }});
+        --border: rgba(63, 63, 70, 0.4);
+        --text: {{ theme.settings.colors.text }};
+        --text-muted: {{ theme.settings.colors.textMuted }};
+        --primary: {{ theme.settings.colors.primary }};
+        --primary-glow: {{ theme.settings.colors.primary }}14;
+        --accent: {{ theme.settings.colors.accent }};
+      }
+      body {
+        margin: 0;
+        font-family: {{ theme.settings.typography.bodyFont }};
+        background-color: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .site-header {
+        background: rgba(9, 9, 11, 0.8);
+        backdrop-filter: blur({{ theme.settings.glowEffects.glassBlur }});
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .site-nav {
+        max-width: {{ theme.settings.layout.containerWidth }};
+        margin: 0 auto;
+        padding: 1rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .brand {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text);
+        text-decoration: none;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .nav-links a {
+        color: var(--text-muted);
+        text-decoration: none;
+        margin-left: 1.5rem;
+        transition: color 0.2s;
+        font-weight: 500;
+      }
+      .nav-links a:hover {
+        color: var(--primary);
+      }
+      .site-main {
+        max-width: {{ theme.settings.typography.contentWidth }};
+        margin: 3rem auto;
+        padding: 0 2rem;
+        flex: 1;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      /* Layout Sidebar Position */
+      .layout-wrapper {
+        display: flex;
+        gap: 2rem;
+        width: 100%;
+      }
+      .main-content-area {
+        flex: 1;
+      }
+      .site-sidebar {
+        width: 280px;
+        flex-shrink: 0;
+        background: var(--card-bg);
+        backdrop-filter: blur(8px);
+        padding: 1.5rem;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        align-self: flex-start;
+      }
+      .layout-wrapper[data-sidebar="none"] .site-sidebar {
+        display: none;
+      }
+      .layout-wrapper[data-sidebar="left"] {
+        flex-direction: row-reverse;
+      }
+      .site-footer {
+        border-top: 1px solid var(--border);
+        background: #09090b;
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+      .footer-links a {
+        color: var(--text-muted);
+        text-decoration: none;
+        margin: 0 0.75rem;
+      }
+      .footer-links a:hover {
+        color: var(--accent);
+      }
+      .home-hero, .page-content, .post-content, .error-container, .search-container {
+        background: var(--card-bg);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--border);
+        padding: 2.5rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 20px var(--primary-glow);
+        margin-bottom: 2rem;
+      }
+      h1, h2, h3 {
+        color: var(--text);
+        margin-top: 0;
+      }
+      h1 {
+        font-size: 2.5rem;
+        background: linear-gradient(to right, #ffffff, var(--primary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 1rem;
+      }
+      p {
+        line-height: 1.6;
+        color: var(--text-muted);
+      }
+      code {
+        background: #18181b;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        color: var(--primary);
+        font-family: monospace;
+      }
+    </style>
+    <style>{{ theme.settings.advanced.customCss }}</style>
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="site-nav">
+        <a class="brand" href="/">{{ site.title }}</a>
+        <div class="nav-links">{{ site.navigationHtml.primary }}</div>
+      </nav>
+    </header>
+    <main class="site-main">
+      <div class="layout-wrapper" data-sidebar="{{ theme.settings.layout.sidebarPosition }}">
+        <div class="main-content-area">
+          {{ content }}
+        </div>
+        <aside class="site-sidebar">
+          {{ widgets.sidebar }}
+        </aside>
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-links">{{ site.navigationHtml.footer }}</div>
+      <p>&copy; {{ site.year }} {{ site.title }} — Built with Neon Elegance</p>
+    </footer>
+  </body>
+</html>

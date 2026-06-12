@@ -2,11 +2,42 @@ import { eq, like } from 'drizzle-orm';
 import { db } from '../database/client.js';
 import { settings } from '../database/schema.js';
 import { pluginEventBus } from '../plugins/pluginEventBus.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function resolveSiteUrl(key: string, originalValue: string): string {
+  if (key !== 'system.site_url') return originalValue;
+  
+  try {
+    const publicConfigPath = path.resolve(__dirname, '../../../../apps/public/vite.config.ts');
+    if (fs.existsSync(publicConfigPath)) {
+      const content = fs.readFileSync(publicConfigPath, 'utf8');
+      const match = content.match(/port\s*:\s*(\d+)/);
+      if (match) {
+        const publicPort = parseInt(match[1], 10);
+        try {
+          const url = new URL(originalValue);
+          url.port = String(publicPort);
+          return url.origin;
+        } catch (e) {
+          return `http://localhost:${publicPort}`;
+        }
+      }
+    }
+  } catch (error) {
+    // Fallback to original value
+  }
+  return originalValue;
+}
 
 export async function getSetting(key: string, defaultValue?: string) {
   const rows = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
 
-  if (rows.length > 0) return rows[0].value;
+  if (rows.length > 0) return resolveSiteUrl(key, rows[0].value);
   if (defaultValue === undefined) return null;
 
   await setSetting(key, defaultValue, {
@@ -15,7 +46,7 @@ export async function getSetting(key: string, defaultValue?: string) {
     isPublic: true,
   });
 
-  return defaultValue;
+  return resolveSiteUrl(key, defaultValue);
 }
 
 export async function getSettingWithFallback(key: string, defaultValue: string, legacyKeys: string[] = []) {
@@ -78,11 +109,19 @@ export async function setSetting(
 }
 
 export async function getPublicSettings() {
-  return db.select().from(settings).where(eq(settings.isPublic, true));
+  const rows = await db.select().from(settings).where(eq(settings.isPublic, true));
+  return rows.map(row => ({
+    ...row,
+    value: resolveSiteUrl(row.key, row.value),
+  }));
 }
 
 export async function getSettingsByScope(scope: string) {
-  return db.select().from(settings).where(like(settings.key, `${scope}.%`));
+  const rows = await db.select().from(settings).where(like(settings.key, `${scope}.%`));
+  return rows.map(row => ({
+    ...row,
+    value: resolveSiteUrl(row.key, row.value),
+  }));
 }
 
 export function createSettingsSdk(source: string) {
@@ -96,3 +135,4 @@ export function createSettingsSdk(source: string) {
     getByScope: getSettingsByScope,
   };
 }
+

@@ -1,0 +1,24 @@
+{
+  "name": "@modern-cms/plugin-seo-suite",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/routes.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "tsx server/test-seo.ts"
+  },
+  "dependencies": {
+    "@modern-cms/plugin-sdk": "workspace:*",
+    "drizzle-orm": "^0.30.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "@types/react": "^18.3.3",
+    "fastify": "^4.26.2",
+    "lucide-react": "^1.16.0",
+    "react": "^18.3.1",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.5"
+  }
+}

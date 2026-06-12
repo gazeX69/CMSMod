@@ -97,10 +97,19 @@ export async function assignAllPermissionsToRole(roleName: string) {
   }
 }
 
-export async function userHasPermission(userId: number, permissionKey: string) {
-  const rows = await db
+export async function getUserPermissionsAndRoles(userId: number) {
+  const roleRows = await db
     .select({
       roleName: roles.name,
+    })
+    .from(userRoles)
+    .innerJoin(roles, eq(userRoles.roleId, roles.id))
+    .where(eq(userRoles.userId, userId));
+
+  const roleNames = roleRows.map((r) => r.roleName);
+
+  const permissionRows = await db
+    .select({
       permissionKey: permissions.key,
     })
     .from(userRoles)
@@ -109,5 +118,28 @@ export async function userHasPermission(userId: number, permissionKey: string) {
     .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
     .where(eq(userRoles.userId, userId));
 
-  return rows.some((row) => row.roleName === 'Admin' || row.permissionKey === permissionKey);
+  const permissionKeys = permissionRows.map((p) => p.permissionKey);
+
+  return {
+    roles: roleNames,
+    permissions: permissionKeys,
+  };
+}
+
+export async function userHasPermission(userId: number, permissionKey: string) {
+  const userAccess = await getUserPermissionsAndRoles(userId);
+
+  if (userAccess.roles.includes('Admin')) {
+    return true;
+  }
+
+  return userAccess.permissions.some((userPerm) => {
+    if (userPerm === permissionKey) return true;
+    if (userPerm === '*') return true;
+    if (userPerm.endsWith('.*')) {
+      const prefix = userPerm.slice(0, -2);
+      return permissionKey.startsWith(prefix + '.');
+    }
+    return false;
+  });
 }

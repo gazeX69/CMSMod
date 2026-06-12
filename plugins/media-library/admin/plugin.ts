@@ -1,7 +1,7 @@
 import { AdminPlugin } from '@modern-cms/plugin-sdk';
 import React from 'react';
 import MediaLibraryPage from './MediaLibraryPage';
-import '../editor/registerEditorIntegration';
+import { registerEditorIntegration } from '../editor/registerEditorIntegration';
 
 const MediaIcon = ({ size = 14, className }: { size?: number; className?: string }) => 
   React.createElement(
@@ -26,7 +26,8 @@ const MediaIcon = ({ size = 14, className }: { size?: number; className?: string
 const MediaLibraryPlugin: AdminPlugin = {
   id: 'media-library',
   icon: MediaIcon,
-  component: MediaLibraryPage
+  component: MediaLibraryPage,
+  register: registerEditorIntegration,
 };
 
 export default MediaLibraryPlugin;
